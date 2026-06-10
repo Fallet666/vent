@@ -3,3 +3,11 @@ build/
 *.a
 *.dSYM/
 .DS_Store
+
+# Build artifacts in project root
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+fanctl

@@ -180,12 +180,18 @@ kern_return_t IntelSMCBackend::read_key_internal(uint32_t key, SMCValue* val) {
 kern_return_t IntelSMCBackend::write_key_internal(const SMCValue& write_val) {
     uint32_t key = strtoul(write_val.key, 4, 16);
 
+    // Read key info to get correct dataType — SMC requires it on write
+    SMCKeyInfo key_info{};
+    kern_return_t result = get_key_info_cached(key, &key_info);
+    if (result != kIOReturnSuccess) return result;
+
     SMCKeyData input{};
     SMCKeyData output{};
 
     input.key = key;
     input.data8 = SMC_CMD_WRITE_BYTES;
     input.keyInfo.dataSize = write_val.data_size;
+    input.keyInfo.dataType = static_cast<uint32_t>(key_info.data_type);
     std::memcpy(input.bytes, write_val.bytes, std::min<size_t>(sizeof(input.bytes), write_val.data_size));
 
     return smc_call(KERNEL_INDEX_SMC, &input, &output);
@@ -372,7 +378,15 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
     if (!initialized_) return false;
 
     auto fs_val = read_key("FS! ");
-    if (!fs_val) return false;
+    if (!fs_val) {
+        // On Apple Silicon FS! may not be readable;
+        // writing F0Tg alone enables manual mode implicitly.
+        return true;
+    }
+
+    // If FS! has data_size == 0, the key is present but not writable.
+    // Writing F0Tg should implicitly set manual mode.
+    if (fs_val->data_size == 0) return true;
 
     uint32_t mask = strtoul(reinterpret_cast<const char*>(fs_val->bytes), fs_val->data_size, 10);
 
@@ -382,12 +396,20 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
         mask &= ~(1 << index);
     }
 
+    // Read key info to determine correct size/type for FS!
+    char key_buf[8];
+    std::snprintf(key_buf, sizeof(key_buf), "FS! ");
+    SMCKeyInfo key_info = get_key_info(key_buf);
+    if (key_info.data_size == 0) {
+        key_info.data_size = 2;
+        key_info.data_type = SMCDataType::UINT16;
+    }
+
     SMCValue val{};
     std::strncpy(val.key, "FS! ", 4);
-    val.data_size = 2;
-    val.data_type = SMCDataType::UINT16;
-    val.bytes[0] = (mask >> 8) & 0xFF;
-    val.bytes[1] = mask & 0xFF;
+    val.data_size = key_info.data_size;
+    val.data_type = key_info.data_type;
+    float_to_bytes(static_cast<float>(mask), val.bytes, key_info.data_type, key_info.data_size);
 
     return write_key(val);
 }
