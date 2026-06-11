@@ -23,6 +23,7 @@ add_library(fan_control STATIC
     src/intel_smc_backend.cpp
     src/fan_controller.cpp
     src/smc_types.cpp
+    src/daemon_ipc.cpp
 )
 
 target_link_libraries(fan_control PUBLIC ${IOKIT} ${COREFOUNDATION})
@@ -30,11 +31,19 @@ target_link_libraries(fan_control PUBLIC ${IOKIT} ${COREFOUNDATION})
 # CLI executable
 add_executable(fanctl
     src/main.cpp
+    src/daemon_client.cpp
 )
 target_link_libraries(fanctl PRIVATE fan_control)
 
+# Daemon executable
+add_executable(fanctld
+    src/fanctld.cpp
+    src/daemon_ipc.cpp
+)
+target_link_libraries(fanctld PRIVATE fan_control)
+
 # Install targets
-install(TARGETS fan_control fanctl
+install(TARGETS fan_control fanctl fanctld
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

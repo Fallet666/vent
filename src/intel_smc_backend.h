@@ -4,6 +4,12 @@
 #include <IOKit/IOKitLib.h>
 #include <os/lock.h>
 #include <memory>
+#include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <unordered_map>
+#include <chrono>
 
 namespace mac_fan_control {
 
@@ -65,6 +71,9 @@ public:
     bool set_fan_max_speed(uint32_t index, float speed) override;
     bool set_fan_target_speed(uint32_t index, float speed) override;
     bool set_fan_manual_mode(uint32_t index, bool manual) override;
+    bool start_persistent_fan_control(uint32_t index, float target_speed) override;
+    bool stop_persistent_fan_control(uint32_t index) override;
+    void stop_all_persistent_fan_control() override;
 
     std::vector<TemperatureInfo> get_all_temperatures() override;
 
@@ -90,6 +99,15 @@ private:
     int key_info_cache_count_ = 0;
     mutable os_unfair_lock key_info_lock_ = OS_UNFAIR_LOCK_INIT;
 
+    struct PersistentFanControl {
+        uint32_t index = 0;
+        std::atomic<float> target_speed{0.0f};
+        std::thread thread;
+        std::atomic<bool> running{false};
+    };
+    std::array<PersistentFanControl, 16> persistent_controls_;
+    mutable std::mutex persistent_mutex_;
+
     static uint32_t strtoul(const char* str, int size, int base);
     static void ultostr(char* str, uint32_t val);
     static void string_to_key(const std::string& str, uint32_t& key);
@@ -103,6 +121,12 @@ private:
     uint32_t read_key_count();
     float get_float_from_val(const SMCValue& val);
     void set_float_to_val(float value, SMCValue& val, SMCDataType type, uint32_t size);
+
+    bool write_key_u8(const char* key_str, uint8_t value);
+    bool write_key_flt(const char* key_str, float value);
+    void apply_apple_silicon_manual(uint32_t index, bool manual);
+    void apply_apple_silicon_manual_and_target(uint32_t index, float target_speed);
+    void apply_apple_silicon_revert(uint32_t index);
 };
 
 } // namespace mac_fan_control

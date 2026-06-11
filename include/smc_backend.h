@@ -29,6 +29,10 @@ public:
     virtual bool set_fan_target_speed(uint32_t index, float speed) = 0;
     virtual bool set_fan_manual_mode(uint32_t index, bool manual) = 0;
 
+    virtual bool start_persistent_fan_control(uint32_t index, float target_speed) = 0;
+    virtual bool stop_persistent_fan_control(uint32_t index) = 0;
+    virtual void stop_all_persistent_fan_control() = 0;
+
     virtual std::vector<TemperatureInfo> get_all_temperatures() = 0;
 
     virtual std::string get_platform_name() const = 0;

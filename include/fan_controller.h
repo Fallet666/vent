@@ -24,6 +24,12 @@ public:
     bool set_fan_auto_mode(uint32_t index);
     bool set_fan_manual_mode(uint32_t index);
 
+    // Persistent fan control (re-applies settings to overcome system thermal daemon)
+    bool start_persistent_control(uint32_t index, float speed_rpm);
+    bool start_persistent_control_percent(uint32_t index, float percent);
+    bool stop_persistent_control(uint32_t index);
+    void stop_all_persistent_control();
+
     // Monitoring
     std::vector<TemperatureInfo> list_temperatures();
     std::optional<float> get_cpu_temperature();

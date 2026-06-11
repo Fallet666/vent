@@ -1,8 +1,14 @@
 #include "intel_smc_backend.h"
+#include "daemon_ipc.h"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <chrono>
 #include <IOKit/IOTypes.h>
 #include <mach/mach_port.h>
 #include <sys/sysctl.h>
@@ -164,7 +170,7 @@ kern_return_t IntelSMCBackend::read_key_internal(uint32_t key, SMCValue* val) {
 
     input.key = key;
     input.data8 = SMC_CMD_READ_BYTES;
-    input.keyInfo.dataSize = 32;
+    input.keyInfo.dataSize = key_info.data_size;
 
     result = smc_call(KERNEL_INDEX_SMC, &input, &output);
     if (result != kIOReturnSuccess) return result;
@@ -318,9 +324,17 @@ std::optional<FanInfo> IntelSMCBackend::get_fan(uint32_t index) {
     if (tg_val) info.target_speed = get_float_from_val(*tg_val);
 
     auto fs_val = read_key("FS! ");
-    if (fs_val) {
+    if (fs_val && fs_val->data_size > 0) {
         uint32_t manual_mask = strtoul(reinterpret_cast<const char*>(fs_val->bytes), fs_val->data_size, 10);
         info.manual_mode = (manual_mask & (1 << index)) != 0;
+    } else {
+        // Apple Silicon: check F%dMd key
+        char md_key[8];
+        std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
+        auto md_val = read_key(md_key);
+        if (md_val && md_val->data_size >= 1) {
+            info.manual_mode = (md_val->bytes[0] & 1) != 0;
+        }
     }
 
     return info;
@@ -358,19 +372,77 @@ bool IntelSMCBackend::set_fan_max_speed(uint32_t index, float speed) {
     return write_key(val);
 }
 
+bool IntelSMCBackend::write_key_u8(const char* key_str, uint8_t value) {
+    SMCValue val{};
+    std::strncpy(val.key, key_str, 4);
+    val.data_size = 1;
+    val.data_type = SMCDataType::UINT8;
+    val.bytes[0] = value;
+    return write_key(val);
+}
+
+bool IntelSMCBackend::write_key_flt(const char* key_str, float value) {
+    SMCValue val{};
+    std::strncpy(val.key, key_str, 4);
+    val.data_size = 4;
+    val.data_type = SMCDataType::FLT;
+    float_to_bytes(value, val.bytes, SMCDataType::FLT, 4);
+    return write_key(val);
+}
+
+void IntelSMCBackend::apply_apple_silicon_manual(uint32_t index, bool manual) {
+    if (manual) {
+        // Unlock Ftst (M3/M4+ needs this to bypass thermalmonitord)
+        write_key_u8("Ftst", 1);
+        // Write F%dMd = 1
+        char md_key[8];
+        std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
+        write_key_u8(md_key, 1);
+    } else {
+        // Write F%dMd = 0
+        char md_key[8];
+        std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
+        write_key_u8(md_key, 0);
+        // Lock Ftst
+        write_key_u8("Ftst", 0);
+    }
+}
+
+void IntelSMCBackend::apply_apple_silicon_manual_and_target(uint32_t index, float target_speed) {
+    write_key_u8("Ftst", 1);
+    char md_key[8];
+    std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
+    write_key_u8(md_key, 1);
+    char tg_key[8];
+    std::snprintf(tg_key, sizeof(tg_key), "F%dTg", index);
+    write_key_flt(tg_key, target_speed);
+}
+
+void IntelSMCBackend::apply_apple_silicon_revert(uint32_t index) {
+    char md_key[8];
+    std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
+    write_key_u8(md_key, 0);
+    write_key_u8("Ftst", 0);
+}
+
 bool IntelSMCBackend::set_fan_target_speed(uint32_t index, float speed) {
     if (!initialized_) return false;
 
+    auto fs_val = read_key("FS! ");
+    if (!fs_val || fs_val->data_size == 0) {
+        // Apple Silicon: use full sequence
+        apply_apple_silicon_manual_and_target(index, speed);
+        return true;
+    }
+
+    // Intel path
     char key[8];
     std::snprintf(key, sizeof(key), "F%dTg", index);
-
     auto current = read_key(key);
     if (!current) return false;
-
     SMCValue val{};
     std::strncpy(val.key, key, 4);
     set_float_to_val(speed, val, current->data_type, current->data_size);
-
     return write_key(val);
 }
 
@@ -378,40 +450,28 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
     if (!initialized_) return false;
 
     auto fs_val = read_key("FS! ");
-    if (!fs_val) {
-        // On Apple Silicon FS! may not be readable;
-        // writing F0Tg alone enables manual mode implicitly.
-        return true;
+    if (fs_val && fs_val->data_size > 0) {
+        // Intel path: use FS! bitmask
+        uint32_t mask = strtoul(reinterpret_cast<const char*>(fs_val->bytes), fs_val->data_size, 10);
+        if (manual) mask |= (1 << index);
+        else mask &= ~(1 << index);
+
+        SMCKeyInfo key_info = get_key_info("FS! ");
+        if (key_info.data_size == 0) {
+            key_info.data_size = 2;
+            key_info.data_type = SMCDataType::UINT16;
+        }
+        SMCValue val{};
+        std::strncpy(val.key, "FS! ", 4);
+        val.data_size = key_info.data_size;
+        val.data_type = key_info.data_type;
+        float_to_bytes(static_cast<float>(mask), val.bytes, key_info.data_type, val.data_size);
+        return write_key(val);
     }
 
-    // If FS! has data_size == 0, the key is present but not writable.
-    // Writing F0Tg should implicitly set manual mode.
-    if (fs_val->data_size == 0) return true;
-
-    uint32_t mask = strtoul(reinterpret_cast<const char*>(fs_val->bytes), fs_val->data_size, 10);
-
-    if (manual) {
-        mask |= (1 << index);
-    } else {
-        mask &= ~(1 << index);
-    }
-
-    // Read key info to determine correct size/type for FS!
-    char key_buf[8];
-    std::snprintf(key_buf, sizeof(key_buf), "FS! ");
-    SMCKeyInfo key_info = get_key_info(key_buf);
-    if (key_info.data_size == 0) {
-        key_info.data_size = 2;
-        key_info.data_type = SMCDataType::UINT16;
-    }
-
-    SMCValue val{};
-    std::strncpy(val.key, "FS! ", 4);
-    val.data_size = key_info.data_size;
-    val.data_type = key_info.data_type;
-    float_to_bytes(static_cast<float>(mask), val.bytes, key_info.data_type, key_info.data_size);
-
-    return write_key(val);
+    // Apple Silicon path
+    apply_apple_silicon_manual(index, manual);
+    return true;
 }
 
 std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
@@ -454,6 +514,80 @@ std::string IntelSMCBackend::get_platform_name() const {
         return "Apple Silicon (IOKit)";
     }
     return "Intel (IOKit)";
+}
+
+bool IntelSMCBackend::start_persistent_fan_control(uint32_t index, float target_speed) {
+    if (!initialized_ || index >= persistent_controls_.size()) return false;
+
+    std::lock_guard<std::mutex> lock(persistent_mutex_);
+    auto& control = persistent_controls_[index];
+
+    if (control.running.load()) {
+        control.target_speed.store(target_speed);
+        return true;
+    }
+
+    control.index = index;
+    control.target_speed.store(target_speed);
+    control.running.store(true);
+
+    control.thread = std::thread([this, index]() {
+        auto& control = persistent_controls_[index];
+        auto fs_val = read_key("FS! ");
+        bool is_apple_silicon = (!fs_val || fs_val->data_size == 0);
+
+        while (control.running.load()) {
+            float target = control.target_speed.load();
+            if (is_apple_silicon) {
+                apply_apple_silicon_manual_and_target(index, target);
+            } else {
+                set_fan_manual_mode(index, true);
+                char key[8];
+                std::snprintf(key, sizeof(key), "F%dTg", index);
+                auto current = read_key(key);
+                if (current) {
+                    SMCValue val{};
+                    std::strncpy(val.key, key, 4);
+                    set_float_to_val(target, val, current->data_type, current->data_size);
+                    write_key(val);
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(RECONCILIATION_INTERVAL_MS));
+        }
+
+        // Revert on exit
+        auto fs_val_after = read_key("FS! ");
+        if (!fs_val_after || fs_val_after->data_size == 0) {
+            apply_apple_silicon_revert(index);
+        } else {
+            set_fan_manual_mode(index, false);
+        }
+    });
+
+    control.thread.detach();
+    return true;
+}
+
+bool IntelSMCBackend::stop_persistent_fan_control(uint32_t index) {
+    if (index >= persistent_controls_.size()) return false;
+
+    std::lock_guard<std::mutex> lock(persistent_mutex_);
+    auto& control = persistent_controls_[index];
+
+    if (!control.running.load()) return false;
+
+    control.running.store(false);
+
+    return true;
+}
+
+void IntelSMCBackend::stop_all_persistent_fan_control() {
+    std::lock_guard<std::mutex> lock(persistent_mutex_);
+    for (auto& control : persistent_controls_) {
+        if (control.running.load()) {
+            control.running.store(false);
+        }
+    }
 }
 
 } // namespace mac_fan_control

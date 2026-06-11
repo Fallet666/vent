@@ -52,6 +52,35 @@ bool FanController::set_fan_manual_mode(uint32_t index) {
     return backend_->set_fan_manual_mode(index, true);
 }
 
+bool FanController::start_persistent_control(uint32_t index, float speed_rpm) {
+    if (!is_available()) return false;
+    return backend_->start_persistent_fan_control(index, speed_rpm);
+}
+
+bool FanController::start_persistent_control_percent(uint32_t index, float percent) {
+    if (!is_available()) return false;
+
+    auto fan = backend_->get_fan(index);
+    if (!fan) return false;
+
+    float min_speed = fan->min_speed;
+    float max_speed = fan->max_speed;
+    if (max_speed <= min_speed) return false;
+
+    float target = min_speed + (max_speed - min_speed) * (percent / 100.0f);
+    return start_persistent_control(index, target);
+}
+
+bool FanController::stop_persistent_control(uint32_t index) {
+    if (!is_available()) return false;
+    return backend_->stop_persistent_fan_control(index);
+}
+
+void FanController::stop_all_persistent_control() {
+    if (!is_available()) return;
+    backend_->stop_all_persistent_fan_control();
+}
+
 std::vector<TemperatureInfo> FanController::list_temperatures() {
     if (!is_available()) return {};
     return backend_->get_all_temperatures();
