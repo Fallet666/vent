@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -35,16 +36,72 @@ struct ClientState {
     std::string buffer;
 };
 
-int main(int argc, char** argv) {
-    bool foreground = false;
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--foreground") == 0 || strcmp(argv[i], "-f") == 0) {
-            foreground = true;
+enum class ControlMode {
+    Auto,
+    ManualRPM,
+    AutoTemp,
+};
+
+static const char* control_mode_to_string(ControlMode mode) {
+    switch (mode) {
+        case ControlMode::Auto: return "AUTO";
+        case ControlMode::ManualRPM: return "MANUAL_RPM";
+        case ControlMode::AutoTemp: return "AUTO_TEMP";
+    }
+    return "AUTO";
+}
+
+static float average_temperature(const std::vector<TemperatureInfo>& temperatures) {
+    float sum = 0.0f;
+    int count = 0;
+    for (const auto& temperature : temperatures) {
+        if (temperature.value >= 20.0f && temperature.value < 130.0f &&
+            temperature.key.rfind("Ta", 0) != 0 && temperature.key.rfind("Tp", 0) != 0)
+        {
+            sum += temperature.value;
+            ++count;
         }
+    }
+    if (count == 0) {
+        return 0.0f;
+    }
+    return sum / static_cast<float>(count);
+}
+
+static float common_min_speed(const std::vector<FanInfo>& fans) {
+    float speed = 0.0f;
+    for (const auto& fan : fans) {
+        speed = std::max(speed, fan.min_speed);
+    }
+    return speed;
+}
+
+static float common_max_speed(const std::vector<FanInfo>& fans) {
+    if (fans.empty()) {
+        return 0.0f;
+    }
+    float speed = fans.front().max_speed;
+    for (const auto& fan : fans) {
+        speed = std::min(speed, fan.max_speed);
+    }
+    return speed;
+}
+
+static float rpm_for_temperature(float current_temperature, float target_temperature, float min_speed, float max_speed) {
+    if (max_speed <= min_speed) {
+        return min_speed;
+    }
+    float normalized = (current_temperature - target_temperature + 3.0f) / 25.0f;
+    normalized = std::clamp(normalized, 0.0f, 1.0f);
+    return min_speed + (max_speed - min_speed) * normalized;
+}
+
+int main(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             std::cerr << "fanctld - macOS Fan Control Daemon\n";
             std::cerr << "Usage: fanctld [options]\n";
-            std::cerr << "  -f, --foreground    Run in foreground (don't daemonize)\n";
+            std::cerr << "  -f, --foreground    Accepted for compatibility; daemon always stays in foreground\n";
             std::cerr << "  -h, --help          Show this help\n";
             return 0;
         }
@@ -55,6 +112,24 @@ int main(int argc, char** argv) {
     if (!backend) {
         std::cerr << "Failed to open SMC\n";
         return 1;
+    }
+    std::cerr << "SMC opened: " << backend->get_platform_name() << "\n";
+
+    // Single-instance guard via PID file
+    const char* PID_FILE = "/tmp/fanctld.pid";
+    int pid_fd = open(PID_FILE, O_CREAT | O_WRONLY, 0644);
+    if (pid_fd >= 0) {
+        struct flock fl = {};
+        fl.l_type = F_WRLCK;
+        fl.l_whence = SEEK_SET;
+        if (fcntl(pid_fd, F_SETLK, &fl) < 0) {
+            std::cerr << "Another daemon instance is running.\n";
+            close(pid_fd);
+            return 0;
+        }
+        // Truncate and write PID
+        ftruncate(pid_fd, 0);
+        dprintf(pid_fd, "%d\n", getpid());
     }
 
     // Remove old socket file
@@ -98,32 +173,16 @@ int main(int argc, char** argv) {
     std::vector<ClientState> clients;
     uint64_t last_heartbeat = 0;
     uint64_t last_reconciliation = 0;
+    uint64_t last_temperature_control = 0;
+    ControlMode control_mode = ControlMode::Auto;
+    float target_temperature = 55.0f;
+    float last_average_temperature = 0.0f;
+    float last_auto_temperature_rpm = 0.0f;
 
     auto now_ms = []() -> uint64_t {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
     };
-
-    // Daemonize
-    if (!foreground) {
-        pid_t pid = fork();
-        if (pid < 0) {
-            std::cerr << "Fork failed\n";
-            close(server_fd);
-            return 1;
-        }
-        if (pid > 0) {
-            _exit(0);
-        }
-        setsid();
-        int dev_null = open("/dev/null", O_RDWR);
-        if (dev_null >= 0) {
-            dup2(dev_null, 0);
-            dup2(dev_null, 1);
-            dup2(dev_null, 2);
-            close(dev_null);
-        }
-    }
 
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
@@ -131,6 +190,7 @@ int main(int argc, char** argv) {
 
     last_heartbeat = now_ms();
     last_reconciliation = now_ms();
+    last_temperature_control = now_ms();
 
     // Main loop
     while (g_running) {
@@ -195,6 +255,7 @@ int main(int argc, char** argv) {
                         if (cmd == "SET" && parts.size() >= 3) {
                             uint32_t fan_idx = std::stoul(parts[1]);
                             float speed = std::stof(parts[2]);
+                            control_mode = ControlMode::ManualRPM;
                             overrides[fan_idx] = speed;
                             last_heartbeat = now;
                             response = "OK";
@@ -206,29 +267,92 @@ int main(int argc, char** argv) {
                             if (fan) {
                                 float range = fan->max_speed - fan->min_speed;
                                 float speed = fan->min_speed + range * (percent / 100.0f);
+                                control_mode = ControlMode::ManualRPM;
                                 overrides[fan_idx] = speed;
                                 response = "OK";
                             } else {
                                 response = "ERR Fan not found";
                             }
                             last_heartbeat = now;
+                        } else if (cmd == "SETALL" && parts.size() >= 2) {
+                            float speed = std::stof(parts[1]);
+                            auto fans = backend->get_all_fans();
+                            control_mode = ControlMode::ManualRPM;
+                            for (const auto& fan : fans) {
+                                overrides[fan.index] = speed;
+                            }
+                            last_heartbeat = now;
+                            response = "OK";
                         } else if (cmd == "AUTO" && parts.size() >= 2) {
                             uint32_t fan_idx = std::stoul(parts[1]);
                             // Revert immediately
-                            backend->set_fan_manual_mode(fan_idx, false);
+                            bool ok = backend->set_fan_manual_mode(fan_idx, false);
                             overrides.erase(fan_idx);
+                            if (overrides.empty()) {
+                                control_mode = ControlMode::Auto;
+                            }
                             last_heartbeat = now;
-                            response = "OK";
+                            response = ok ? "OK" : "ERR Failed to set auto mode";
                         } else if (cmd == "AUTOALL") {
+                            bool ok = true;
+                            auto fans = backend->get_all_fans();
+                            for (const auto& fan : fans) {
+                                ok = backend->set_fan_manual_mode(fan.index, false) && ok;
+                            }
                             for (auto& [idx, _] : overrides) {
-                                backend->set_fan_manual_mode(idx, false);
+                                ok = backend->set_fan_manual_mode(idx, false) && ok;
                             }
                             overrides.clear();
+                            control_mode = ControlMode::Auto;
                             last_heartbeat = now;
-                            response = "OK";
+                            response = ok ? "OK" : "ERR Failed to set auto mode";
+                        } else if (cmd == "MODE" && parts.size() >= 2) {
+                            if (parts[1] == "AUTO") {
+                                bool ok = true;
+                                auto fans = backend->get_all_fans();
+                                for (const auto& fan : fans) {
+                                    ok = backend->set_fan_manual_mode(fan.index, false) && ok;
+                                }
+                                overrides.clear();
+                                control_mode = ControlMode::Auto;
+                                response = ok ? "OK" : "ERR Failed to set auto mode";
+                            } else if (parts[1] == "MANUAL") {
+                                control_mode = ControlMode::ManualRPM;
+                                response = "OK";
+                            } else if (parts[1] == "TEMP" && parts.size() >= 3) {
+                                target_temperature = std::clamp(std::stof(parts[2]), 20.0f, 95.0f);
+                                control_mode = ControlMode::AutoTemp;
+                                last_temperature_control = 0;
+                                response = "OK";
+                            } else {
+                                response = "ERR Invalid mode";
+                            }
+                            last_heartbeat = now;
                         } else if (cmd == "HEARTBEAT") {
                             last_heartbeat = now;
                             response = "OK";
+                        } else if (cmd == "MODESTATUS") {
+                            response = "MODE " + std::string(control_mode_to_string(control_mode)) + " " +
+                                std::to_string(target_temperature) + " " +
+                                std::to_string(last_average_temperature) + " " +
+                                std::to_string(last_auto_temperature_rpm);
+                        } else if (cmd == "FANS") {
+                            auto fans = backend->get_all_fans();
+                            response = "FANS " + std::to_string(fans.size());
+                            for (const auto& fan : fans) {
+                                response += "\n" + std::to_string(fan.index) + " " +
+                                    std::to_string((int)fan.current_speed) + " " +
+                                    std::to_string((int)fan.min_speed) + " " +
+                                    std::to_string((int)fan.max_speed) + " " +
+                                    std::to_string((int)fan.target_speed) + " " +
+                                    std::to_string(fan.manual_mode ? 1 : 0);
+                            }
+                        } else if (cmd == "TEMPS") {
+                            auto temperatures = backend->get_all_temperatures();
+                            response = "TEMPS " + std::to_string(temperatures.size());
+                            for (const auto& temperature : temperatures) {
+                                response += "\n" + temperature.key + " " + std::to_string(temperature.value);
+                            }
                         } else if (cmd == "STATUS") {
                             response = "STATUS " + std::to_string(overrides.size());
                             for (auto& [idx, speed] : overrides) {
@@ -269,20 +393,49 @@ int main(int argc, char** argv) {
             }
         }
 
+        // --- Auto temperature control (every 2 seconds) ---
+        if (control_mode == ControlMode::AutoTemp && (now - last_temperature_control >= 2000)) {
+            last_temperature_control = now;
+            auto temperatures = backend->get_all_temperatures();
+            auto fans = backend->get_all_fans();
+            last_average_temperature = average_temperature(temperatures);
+
+            if (last_average_temperature > 0.0f && !fans.empty()) {
+                float min_speed = common_min_speed(fans);
+                float max_speed = common_max_speed(fans);
+                last_auto_temperature_rpm = rpm_for_temperature(
+                    last_average_temperature,
+                    target_temperature,
+                    min_speed,
+                    max_speed
+                );
+                for (const auto& fan : fans) {
+                    overrides[fan.index] = last_auto_temperature_rpm;
+                }
+            }
+        }
+
         // --- Reconciliation (every 300ms) ---
         if (now - last_reconciliation >= RECONCILIATION_INTERVAL_MS) {
             last_reconciliation = now;
             for (auto& [fan_idx, target_speed] : overrides) {
-                backend->set_fan_target_speed(fan_idx, target_speed);
+                bool ok = backend->set_fan_target_speed(fan_idx, target_speed);
+                if (!ok) {
+                    std::cerr << "reconcile: fan " << fan_idx << " -> " << target_speed
+                              << " RPM [FAIL]\n";
+                }
             }
         }
 
         // --- Watchdog (every cycle, check if expired) ---
-        if (!overrides.empty() && (now - last_heartbeat) > (uint64_t)WATCHDOG_TIMEOUT_SECONDS * 1000) {
+        if (control_mode == ControlMode::ManualRPM && !overrides.empty() &&
+            (now - last_heartbeat) > (uint64_t)WATCHDOG_TIMEOUT_SECONDS * 1000)
+        {
             for (auto& [idx, _] : overrides) {
                 backend->set_fan_manual_mode(idx, false);
             }
             overrides.clear();
+            control_mode = ControlMode::Auto;
             last_heartbeat = now;
         }
 

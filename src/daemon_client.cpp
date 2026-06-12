@@ -80,6 +80,11 @@ bool daemon_send_set_percent(uint32_t index, float percent) {
     return daemon_send_command(cmd);
 }
 
+bool daemon_send_set_all(float speed_rpm) {
+    std::string cmd = "SETALL " + std::to_string(speed_rpm);
+    return daemon_send_command(cmd);
+}
+
 bool daemon_send_auto(uint32_t index) {
     std::string cmd = "AUTO " + std::to_string(index);
     return daemon_send_command(cmd);

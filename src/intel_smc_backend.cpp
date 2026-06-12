@@ -9,11 +9,58 @@
 #include <mutex>
 #include <thread>
 #include <chrono>
+#include <cctype>
 #include <IOKit/IOTypes.h>
 #include <mach/mach_port.h>
 #include <sys/sysctl.h>
 
 namespace mac_fan_control {
+
+namespace {
+
+std::vector<TemperatureInfo> read_powermetrics_temperatures() {
+    std::vector<TemperatureInfo> temperatures;
+    FILE* pipe = popen("/usr/bin/powermetrics --samplers smc -n 1 -i 1 2>/dev/null", "r");
+    if (!pipe) return temperatures;
+
+    char line[512];
+    int temperature_index = 0;
+    while (fgets(line, sizeof(line), pipe)) {
+        std::string text(line);
+        std::string lowercase = text;
+        std::transform(lowercase.begin(), lowercase.end(), lowercase.begin(), [](unsigned char character) {
+            return static_cast<char>(std::tolower(character));
+        });
+        if (lowercase.find("temperature") == std::string::npos) continue;
+
+        char* cursor = line;
+        while (*cursor && !std::isdigit(static_cast<unsigned char>(*cursor)) && *cursor != '-') {
+            ++cursor;
+        }
+        if (!*cursor) continue;
+
+        char* end = nullptr;
+        float value = std::strtof(cursor, &end);
+        if (end == cursor || value <= 0.0f || value >= 130.0f) continue;
+
+        TemperatureInfo temperature;
+        temperature.key = "PM" + std::to_string(temperature_index++);
+        temperature.value = value;
+        temperatures.push_back(temperature);
+    }
+
+    pclose(pipe);
+    return temperatures;
+}
+
+bool is_temperature_usable(const std::string& key, float value) {
+    if (value < 20.0f || value >= 130.0f) {
+        return false;
+    }
+    return key.rfind("Ta", 0) != 0 && key.rfind("Tp", 0) != 0;
+}
+
+} // namespace
 
 IntelSMCBackend::IntelSMCBackend() {
     std::memset(key_info_cache_, 0, sizeof(key_info_cache_));
@@ -390,32 +437,31 @@ bool IntelSMCBackend::write_key_flt(const char* key_str, float value) {
     return write_key(val);
 }
 
-void IntelSMCBackend::apply_apple_silicon_manual(uint32_t index, bool manual) {
+bool IntelSMCBackend::apply_apple_silicon_manual(uint32_t index, bool manual) {
     if (manual) {
-        // Unlock Ftst (M3/M4+ needs this to bypass thermalmonitord)
-        write_key_u8("Ftst", 1);
-        // Write F%dMd = 1
+        bool ok = write_key_u8("Ftst", 1);
         char md_key[8];
         std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
-        write_key_u8(md_key, 1);
+        ok = write_key_u8(md_key, 1) && ok;
+        return ok;
     } else {
-        // Write F%dMd = 0
         char md_key[8];
         std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
-        write_key_u8(md_key, 0);
-        // Lock Ftst
-        write_key_u8("Ftst", 0);
+        bool ok = write_key_u8(md_key, 0);
+        ok = write_key_u8("Ftst", 0) && ok;
+        return ok;
     }
 }
 
-void IntelSMCBackend::apply_apple_silicon_manual_and_target(uint32_t index, float target_speed) {
-    write_key_u8("Ftst", 1);
+bool IntelSMCBackend::apply_apple_silicon_manual_and_target(uint32_t index, float target_speed) {
+    bool ok = write_key_u8("Ftst", 1);
     char md_key[8];
     std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
-    write_key_u8(md_key, 1);
+    ok = write_key_u8(md_key, 1) && ok;
     char tg_key[8];
     std::snprintf(tg_key, sizeof(tg_key), "F%dTg", index);
-    write_key_flt(tg_key, target_speed);
+    ok = write_key_flt(tg_key, target_speed) && ok;
+    return ok;
 }
 
 void IntelSMCBackend::apply_apple_silicon_revert(uint32_t index) {
@@ -430,9 +476,7 @@ bool IntelSMCBackend::set_fan_target_speed(uint32_t index, float speed) {
 
     auto fs_val = read_key("FS! ");
     if (!fs_val || fs_val->data_size == 0) {
-        // Apple Silicon: use full sequence
-        apply_apple_silicon_manual_and_target(index, speed);
-        return true;
+        return apply_apple_silicon_manual_and_target(index, speed);
     }
 
     // Intel path
@@ -469,17 +513,36 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
         return write_key(val);
     }
 
-    // Apple Silicon path
-    apply_apple_silicon_manual(index, manual);
-    return true;
+    return apply_apple_silicon_manual(index, manual);
 }
 
 std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     std::vector<TemperatureInfo> temps;
     if (!initialized_) return temps;
 
+    const char* known_temperature_keys[] = {
+        "TC0P", "TC0E", "TC0F", "TC0D", "TC1C", "TC2C", "TC3C",
+        "TG0P", "TG0D", "TG1D", "TG0H", "Tm0P", "TB0T", "Th0H",
+        "Ts0P", "Ts0S"
+    };
+
+    for (const auto* key : known_temperature_keys) {
+        auto value = read_key(key);
+        if (!value) continue;
+
+        float temperature_value = get_float_from_val(*value);
+        if (!is_temperature_usable(key, temperature_value)) continue;
+
+        TemperatureInfo temperature;
+        temperature.key = key;
+        temperature.value = temperature_value;
+        temps.push_back(temperature);
+    }
+
+    if (!temps.empty()) return temps;
+
     uint32_t total = read_key_count();
-    if (total == 0) return temps;
+    if (total == 0) return read_powermetrics_temperatures();
 
     for (uint32_t i = 0; i < total; ++i) {
         SMCKeyData input{};
@@ -499,14 +562,18 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
         if (read_key_internal(output.key, &val) != kIOReturnSuccess) continue;
 
         if (val.data_type == SMCDataType::SP78 && val.data_size >= 2) {
+            float temperature_value = get_float_from_val(val);
+            if (!is_temperature_usable(key_str, temperature_value)) continue;
+
             TemperatureInfo temp;
             temp.key = key_str;
-            temp.value = get_float_from_val(val);
+            temp.value = temperature_value;
             temps.push_back(temp);
         }
     }
 
-    return temps;
+    if (!temps.empty()) return temps;
+    return read_powermetrics_temperatures();
 }
 
 std::string IntelSMCBackend::get_platform_name() const {

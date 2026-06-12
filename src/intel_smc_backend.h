@@ -124,8 +124,8 @@ private:
 
     bool write_key_u8(const char* key_str, uint8_t value);
     bool write_key_flt(const char* key_str, float value);
-    void apply_apple_silicon_manual(uint32_t index, bool manual);
-    void apply_apple_silicon_manual_and_target(uint32_t index, float target_speed);
+    bool apply_apple_silicon_manual(uint32_t index, bool manual);
+    bool apply_apple_silicon_manual_and_target(uint32_t index, float target_speed);
     void apply_apple_silicon_revert(uint32_t index);
 };
 

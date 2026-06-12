@@ -130,7 +130,7 @@ static void cmd_persist(FanController& ctrl, int argc, char** argv) {
     if (daemon_is_running()) {
         if (daemon_send_set(index, speed)) {
             std::cout << "Fan #" << index << " persistent control set to " << speed << " RPM via daemon.\n";
-            std::cout << "Press Ctrl+C to stop.\n";
+            std::cout << "Press Ctrl+C to stop (watchdog reverts after 10s).\n";
             std::signal(SIGINT, handle_signal);
             while (g_keep_running) {
                 daemon_send_heartbeat();
@@ -138,8 +138,8 @@ static void cmd_persist(FanController& ctrl, int argc, char** argv) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
             }
-            daemon_send_auto(index);
-            std::cout << "\nFan #" << index << " returned to automatic mode.\n";
+            std::cout << "\nDisconnected. Daemon watchdog will revert fan #" << index << " to auto after 10s.\n";
+            std::cout << "Use 'fanctl unpersist " << index << "' to revert immediately.\n";
             return;
         }
         std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
@@ -172,7 +172,7 @@ static void cmd_persist_percent(FanController& ctrl, int argc, char** argv) {
     if (daemon_is_running()) {
         if (daemon_send_set_percent(index, percent)) {
             std::cout << "Fan #" << index << " persistent control set to " << percent << "% via daemon.\n";
-            std::cout << "Press Ctrl+C to stop.\n";
+            std::cout << "Press Ctrl+C to stop (watchdog reverts after 10s).\n";
             std::signal(SIGINT, handle_signal);
             while (g_keep_running) {
                 daemon_send_heartbeat();
@@ -180,8 +180,8 @@ static void cmd_persist_percent(FanController& ctrl, int argc, char** argv) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
             }
-            daemon_send_auto(index);
-            std::cout << "\nFan #" << index << " returned to automatic mode.\n";
+            std::cout << "\nDisconnected. Daemon watchdog will revert fan #" << index << " to auto after 10s.\n";
+            std::cout << "Use 'fanctl unpersist " << index << "' to revert immediately.\n";
             return;
         }
         std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
@@ -231,6 +231,59 @@ static void cmd_unpersist(FanController& ctrl, int argc, char** argv) {
         // Just try setting auto mode directly
         ctrl.set_fan_auto_mode(index);
         std::cout << "Fan #" << index << " set to auto mode.\n";
+    }
+}
+
+static void cmd_persist_all(FanController& ctrl, int argc, char** argv) {
+    if (argc < 1) {
+        std::cerr << "Usage: fanctl persist-all <speed_rpm>\n";
+        return;
+    }
+
+    float speed = std::atof(argv[0]);
+
+    if (daemon_is_running()) {
+        if (daemon_send_set_all(speed)) {
+            auto fans = ctrl.list_fans();
+            for (const auto& fan : fans) {
+                std::cout << "Fan #" << fan.index << " persistent control set to " << speed << " RPM via daemon.\n";
+            }
+            std::cout << "Press Ctrl+C to stop (watchdog reverts after 10s).\n";
+            std::signal(SIGINT, handle_signal);
+            while (g_keep_running) {
+                daemon_send_heartbeat();
+                for (int i = 0; i < 20 && g_keep_running; ++i) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+            std::cout << "\nDisconnected. Daemon watchdog will revert all fans to auto after 10s.\n";
+            std::cout << "Use 'fanctl unpersist-all' to revert immediately.\n";
+            return;
+        }
+        std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
+    }
+
+    // Fallback: start persistent control for each fan
+    auto fans = ctrl.list_fans();
+    bool any_ok = false;
+    for (const auto& fan : fans) {
+        if (ctrl.start_persistent_control(fan.index, speed)) {
+            std::cout << "Persistent control started for fan #" << fan.index << " at " << speed << " RPM\n";
+            any_ok = true;
+        }
+    }
+    if (any_ok) {
+        std::cout << "Press Ctrl+C to stop.\n";
+        std::signal(SIGINT, handle_signal);
+        while (g_keep_running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        for (const auto& fan : fans) {
+            ctrl.stop_persistent_control(fan.index);
+        }
+        std::cout << "\nPersistent control stopped.\n";
+    } else {
+        std::cerr << "Failed to start persistent control for any fan.\n";
     }
 }
 
@@ -338,6 +391,7 @@ static void print_usage() {
     std::cerr << "  auto <index>                     Return fan to automatic mode\n";
     std::cerr << "  persist <index> <rpm>             Persistent fan control (via daemon or direct)\n";
     std::cerr << "  persist-percent <index> <percent> Persistent fan control (% via daemon or direct)\n";
+    std::cerr << "  persist-all <rpm>                 Set ALL fans to same RPM\n";
     std::cerr << "  unpersist <index>                Stop persistent control for fan\n";
     std::cerr << "  unpersist-all                    Stop all persistent control\n";
     std::cerr << "  info                             Show platform, daemon, and sensor info\n";
@@ -408,6 +462,8 @@ int main(int argc, char** argv) {
         cmd_persist(ctrl, cmd_argc, cmd_argv);
     } else if (cmd == "persist-percent") {
         cmd_persist_percent(ctrl, cmd_argc, cmd_argv);
+    } else if (cmd == "persist-all") {
+        cmd_persist_all(ctrl, cmd_argc, cmd_argv);
     } else if (cmd == "unpersist") {
         cmd_unpersist(ctrl, cmd_argc, cmd_argv);
     } else if (cmd == "unpersist-all") {

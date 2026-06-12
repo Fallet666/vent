@@ -275,11 +275,41 @@ inline void float_to_bytes(float value, uint8_t* bytes, SMCDataType type, uint32
             }
             break;
         }
+        case SMCDataType::UINT8: {
+            if (size >= 1) {
+                bytes[0] = static_cast<uint8_t>(value);
+            }
+            break;
+        }
+        case SMCDataType::SINT8: {
+            if (size >= 1) {
+                bytes[0] = static_cast<uint8_t>(static_cast<int8_t>(value));
+            }
+            break;
+        }
         case SMCDataType::UINT16: {
             if (size >= 2) {
                 uint16_t raw = static_cast<uint16_t>(value);
                 bytes[0] = (raw >> 8) & 0xFF;
                 bytes[1] = raw & 0xFF;
+            }
+            break;
+        }
+        case SMCDataType::UINT32: {
+            if (size >= 4) {
+                uint32_t raw = static_cast<uint32_t>(value);
+                bytes[0] = (raw >> 24) & 0xFF;
+                bytes[1] = (raw >> 16) & 0xFF;
+                bytes[2] = (raw >> 8) & 0xFF;
+                bytes[3] = raw & 0xFF;
+            }
+            break;
+        }
+        case SMCDataType::SINT16: {
+            if (size >= 2) {
+                int16_t raw = static_cast<int16_t>(value);
+                bytes[0] = (static_cast<uint16_t>(raw) >> 8) & 0xFF;
+                bytes[1] = static_cast<uint16_t>(raw) & 0xFF;
             }
             break;
         }
