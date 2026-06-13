@@ -1,21 +1,21 @@
 import AppKit
 import SwiftUI
 
-@main
-struct FanControlGUIApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        Settings {
-            EmptyView()
-        }
-    }
-}
-
 @MainActor
+@main
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static var sharedDelegate: AppDelegate?
+
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
+
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = AppDelegate()
+        sharedDelegate = delegate
+        application.delegate = delegate
+        application.run()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -36,6 +36,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = loadMenuBarImage()
             button.target = self
             button.action = #selector(togglePopover)
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.showPopover()
         }
     }
 
