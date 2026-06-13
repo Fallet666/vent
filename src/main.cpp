@@ -1,5 +1,6 @@
 #include "fan_controller.h"
 #include "daemon_client.h"
+#include "daemon_ipc.h"
 #include <iostream>
 #include <iomanip>
 #include <cstring>
@@ -389,7 +390,7 @@ static void cmd_list_keys(FanController& ctrl) {
 }
 
 static void print_usage() {
-    std::cerr << "macOS Fan Control Utility v1.0.0\n";
+    std::cerr << "macOS Fan Control Utility v" << APP_VERSION << "\n";
     std::cerr << "Usage: fanctl <command> [args...]\n\n";
     std::cerr << "Commands:\n";
     std::cerr << "  list                             List all fans with speed info\n";

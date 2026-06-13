@@ -1,0 +1,76 @@
+name: Mac compatibility report
+description: Report how FanControl works on your Mac model
+title: "Compatibility: <Mac model> on <macOS version>"
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve FanControl across more Mac models.
+
+  - type: input
+    id: mac-model
+    attributes:
+      label: Mac model
+      description: "Example: MacBook Pro 14-inch M4 Pro, MacBook Pro 16-inch 2019 Intel"
+      placeholder: MacBook Pro ...
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cpu-family
+    attributes:
+      label: CPU family
+      options:
+        - Apple Silicon
+        - Intel
+        - Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: fan-count
+    attributes:
+      label: Number of fans detected
+      placeholder: "2"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: behavior
+    attributes:
+      label: What works?
+      options:
+        - label: App opens from the menu bar
+        - label: Helper installs or updates successfully
+        - label: Auto mode works
+        - label: Manual RPM changes fan speed
+        - label: Auto Temp changes fan speed
+        - label: Temperature display looks reasonable
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics output
+      description: Paste output from the commands below if possible.
+      value: |
+        ```bash
+        fanctl list
+        fanctl temps
+        fanctl daemon status
+        ```
+      render: shell
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else that looked confusing, broken, or unexpectedly good.

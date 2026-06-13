@@ -4,10 +4,14 @@ import SwiftUI
 @MainActor
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let resizePanelNotification = Notification.Name("FanControlResizePanel")
     private static var sharedDelegate: AppDelegate?
 
     private var statusItem: NSStatusItem?
-    private let popover = NSPopover()
+    private var panel: FanControlPanel?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
+    private let panelWidth: CGFloat = 320
 
     static func main() {
         let application = NSApplication.shared
@@ -20,14 +24,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
 
-        let popoverContent = ContentView()
-            .environmentObject(DaemonManager.shared)
-            .environment(\.controlActiveState, .key)
-            .frame(width: 320)
-        popover.contentSize = NSSize(width: 320, height: 500)
-        popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: popoverContent)
-
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem = item
 
@@ -38,8 +34,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover)
         }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.showPopover()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(resizePanelToFitContent),
+            name: Self.resizePanelNotification,
+            object: nil
+        )
+        installOutsideClickMonitors()
+
+        DaemonManager.shared.refresh()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+        }
+        if let globalEventMonitor {
+            NSEvent.removeMonitor(globalEventMonitor)
         }
     }
 
@@ -49,21 +61,133 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover() {
-        if popover.isShown {
-            popover.performClose(nil)
+        if panel?.isVisible == true && panel?.isKeyWindow == true {
+            closePanel()
         } else {
-            showPopover()
+            showPanel()
         }
     }
 
     private func showPopover() {
-        guard let button = statusItem?.button else { return }
+        showPanel()
+    }
+
+    private func showPanel() {
+        guard let button = statusItem?.button,
+              let buttonWindow = button.window,
+              let screen = buttonWindow.screen ?? NSScreen.main else { return }
         DaemonManager.shared.refresh()
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+
+        let panel = panel ?? makePanel()
+        self.panel = panel
+        let panelSize = adaptivePanelSize(for: panel, screen: screen)
+        panel.setContentSize(panelSize)
+        panel.setFrameOrigin(panelOrigin(for: button, panelSize: panelSize, screen: screen))
+        panel.displayIfNeeded()
         NSApplication.shared.activate(ignoringOtherApps: true)
-        DispatchQueue.main.async { [weak self] in
-            self?.popover.contentViewController?.view.window?.makeKey()
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+    }
+
+    private func closePanel() {
+        panel?.orderOut(nil)
+    }
+
+    private func installOutsideClickMonitors() {
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            if event.window !== self.panel, event.window !== self.statusItem?.button?.window {
+                self.closePanel()
+            }
+            return event
         }
+
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.closePanelIfClickIsOutside()
+            }
+        }
+    }
+
+    private func closePanelIfClickIsOutside() {
+        guard let panel, panel.isVisible else { return }
+        if !panel.frame.contains(NSEvent.mouseLocation) {
+            closePanel()
+        }
+    }
+
+    @objc private func resizePanelToFitContent() {
+        guard let panel,
+              panel.isVisible else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let panel = self.panel,
+                  let button = self.statusItem?.button,
+                  let buttonWindow = button.window,
+                  let screen = buttonWindow.screen ?? NSScreen.main else { return }
+            panel.contentView?.layoutSubtreeIfNeeded()
+            let panelSize = self.adaptivePanelSize(for: panel, screen: screen)
+            var frame = panel.frame
+            frame.origin = self.panelOrigin(for: button, panelSize: panelSize, screen: screen)
+            frame.size = panelSize
+            panel.setFrame(frame, display: true, animate: false)
+        }
+    }
+
+    static func requestPanelResize() {
+        NotificationCenter.default.post(name: resizePanelNotification, object: nil)
+    }
+
+    private func makePanel() -> FanControlPanel {
+        let content = ContentView()
+            .environmentObject(DaemonManager.shared)
+            .environment(\.controlActiveState, .key)
+            .frame(width: panelWidth)
+        let hostingView = NSHostingView(rootView: content)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        let panel = FanControlPanel(
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 360),
+            styleMask: [.borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.isMovable = false
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.worksWhenModal = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.contentView = hostingView
+        return panel
+    }
+
+    private func adaptivePanelSize(for panel: NSPanel, screen: NSScreen) -> NSSize {
+        panel.contentView?.layoutSubtreeIfNeeded()
+        let fittingHeight = panel.contentView?.subviews.first?.fittingSize.height ?? panel.contentView?.fittingSize.height ?? 360
+        let maxHeight = min(screen.visibleFrame.height - 24, 520)
+        let height = min(max(fittingHeight, 250), maxHeight)
+        return NSSize(width: panelWidth, height: ceil(height))
+    }
+
+    private func panelOrigin(for button: NSStatusBarButton, panelSize: NSSize, screen: NSScreen) -> NSPoint {
+        guard let buttonWindow = button.window else { return NSPoint(x: 24, y: 24) }
+        let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let visibleFrame = screen.visibleFrame
+        let preferredX = buttonFrame.midX - panelSize.width / 2
+        let preferredY = buttonFrame.minY - panelSize.height - 8
+        let clampedX = min(max(preferredX, visibleFrame.minX + 8), visibleFrame.maxX - panelSize.width - 8)
+        let clampedY = max(preferredY, visibleFrame.minY + 8)
+        return NSPoint(x: clampedX, y: clampedY)
     }
 
     @objc private func quit() {
@@ -77,6 +201,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         image?.size = NSSize(width: 18, height: 18)
         return image
     }
+}
+
+final class FanControlPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 @MainActor
@@ -93,6 +222,9 @@ final class DaemonManager: ObservableObject {
     @Published var separateFans = false
     @Published var config: DaemonConfig?
     @Published var isInstalling = false
+    @Published var isUninstalling = false
+    @Published var helperVersion: String?
+    @Published var bundledVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
 
     private var refreshTask: Task<Void, Never>?
     private var smoothedAverageTemperature: Double?
@@ -106,10 +238,12 @@ final class DaemonManager: ObservableObject {
         guard daemonOnline else {
             fans = []
             averageTemperature = nil
-            statusMessage = "Daemon offline"
+            helperVersion = nil
+            statusMessage = "Helper not installed"
             return
         }
 
+        helperVersion = DaemonClient.shared.version()
         let daemonFans = DaemonClient.shared.fans() ?? []
         if let daemonConfig = DaemonClient.shared.config() {
             config = daemonConfig
@@ -140,7 +274,12 @@ final class DaemonManager: ObservableObject {
         } else {
             averageTemperature = smoothedTemperature(fallbackAverageTemperature)
         }
-        statusMessage = "Daemon online - \(fans.count) fan(s)"
+        statusMessage = "Ready"
+    }
+
+    var helperNeedsUpdate: Bool {
+        guard let helperVersion else { return !daemonOnline }
+        return helperVersion != bundledVersion
     }
 
     func setControlMode(_ mode: FanControlMode) {
@@ -164,7 +303,7 @@ final class DaemonManager: ObservableObject {
         }
         guard daemonOnline, controlMode == .autoTemp else { return }
         statusMessage = DaemonClient.shared.setMode(.autoTemp, targetTemperature: targetTemperature) ?
-            "Target temperature \(Int(targetTemperature.rounded())) C" : "Failed to set target temperature"
+            "Target temperature updated" : "Failed to set target temperature"
     }
 
     func setFan(index: Int, rpm: Int) {
@@ -203,7 +342,7 @@ final class DaemonManager: ObservableObject {
     }
 
     func installOrUpdateDaemon() {
-        guard !isInstalling else { return }
+        guard !isInstalling, !isUninstalling else { return }
         isInstalling = true
         statusMessage = "Requesting admin permission..."
 
@@ -214,6 +353,34 @@ final class DaemonManager: ObservableObject {
                 self.statusMessage = result.message
                 self.refresh()
             }
+        }
+    }
+
+    func uninstallDaemon() {
+        guard !isInstalling, !isUninstalling else { return }
+        isUninstalling = true
+        statusMessage = "Requesting admin permission..."
+
+        Task.detached {
+            let result = FanControlInstaller.uninstallDaemon()
+            await MainActor.run {
+                self.isUninstalling = false
+                self.statusMessage = result.message
+                self.refresh()
+            }
+        }
+    }
+
+    func confirmAndUninstallDaemon() {
+        guard !isInstalling, !isUninstalling else { return }
+        let alert = NSAlert()
+        alert.messageText = "Uninstall privileged helper?"
+        alert.informativeText = "FanControl will switch fans back to Auto, stop the daemon, and remove installed helper binaries. The app itself will stay installed."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            uninstallDaemon()
         }
     }
 
@@ -338,8 +505,29 @@ enum FanControlInstaller {
         launchctl bootstrap system /Library/LaunchDaemons/com.fanctl.daemon.plist 2>/dev/null || launchctl load /Library/LaunchDaemons/com.fanctl.daemon.plist
         """
 
+        return runPrivilegedScript(script, successMessage: "Helper installed/updated")
+    }
+
+    static func uninstallDaemon() -> InstallResult {
+        let script = """
+        set -e
+        if [ -S /tmp/fanctl.sock ]; then
+            printf 'MODE AUTO\\n' | nc -U /tmp/fanctl.sock >/dev/null 2>&1 || true
+            printf 'SHUTDOWN\\n' | nc -U /tmp/fanctl.sock >/dev/null 2>&1 || true
+        fi
+        launchctl bootout system/com.fanctl.daemon 2>/dev/null || true
+        killall fanctld 2>/dev/null || true
+        rm -f /Library/LaunchDaemons/com.fanctl.daemon.plist
+        rm -f /usr/local/bin/fanctld /usr/local/bin/fanctl
+        rm -f /tmp/fanctl.sock /tmp/fanctld.pid
+        """
+
+        return runPrivilegedScript(script, successMessage: "Helper uninstalled")
+    }
+
+    private static func runPrivilegedScript(_ script: String, successMessage: String) -> InstallResult {
         let tempScriptURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fancontrol-install-\(UUID().uuidString).sh")
+            .appendingPathComponent("fancontrol-admin-\(UUID().uuidString).sh")
 
         do {
             try script.write(to: tempScriptURL, atomically: true, encoding: .utf8)
@@ -356,11 +544,11 @@ enum FanControlInstaller {
             process.waitUntilExit()
 
             if process.terminationStatus == 0 {
-                return InstallResult(success: true, message: "Daemon installed/updated")
+                return InstallResult(success: true, message: successMessage)
             }
-            return InstallResult(success: false, message: "Install cancelled or failed")
+            return InstallResult(success: false, message: "Admin action cancelled or failed")
         } catch {
-            return InstallResult(success: false, message: "Install failed: \(error.localizedDescription)")
+            return InstallResult(success: false, message: "Admin action failed: \(error.localizedDescription)")
         }
     }
 

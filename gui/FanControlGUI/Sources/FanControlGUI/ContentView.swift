@@ -2,46 +2,68 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var daemon: DaemonManager
+    @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
+    @State private var showsSettings = false
+
+    private var temperatureUnit: TemperatureUnit {
+        TemperatureUnit(rawValue: temperatureUnitRaw) ?? .celsius
+    }
 
     var body: some View {
-        VStack(spacing: 10) {
-            if daemon.daemonOnline {
-                temperatureView
-                modePicker
-                activeModeView
+        VStack(spacing: 7) {
+            if showsSettings {
+                settingsView
             } else {
-                offlineView
+                mainView
             }
 
             Divider()
             footerView
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.top, 15)
+        .padding(.bottom, 5)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7)
+        )
+        .compositingGroup()
         .onAppear { daemon.refresh() }
+    }
+
+    @ViewBuilder
+    private var mainView: some View {
+        if daemon.daemonOnline {
+            temperatureView
+            modePicker
+            activeModeView
+        } else {
+            offlineView
+        }
     }
 
     private var temperatureView: some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text("Average temperature")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(temperatureText)
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                Text(temperatureText(daemon.averageTemperature))
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
             }
             Spacer()
-            if let autoRPM = daemon.autoTemperatureRPM, daemon.controlMode == .autoTemp {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Auto RPM")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(autoRPM)")
-                        .font(.title3.monospacedDigit().weight(.semibold))
-                }
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(rpmSummaryTitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(rpmSummaryText)
+                    .font(.title3.monospacedDigit().weight(.semibold))
             }
         }
-        .padding(10)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -50,7 +72,7 @@ struct ContentView: View {
             get: { daemon.controlMode },
             set: { daemon.setControlMode($0) }
         )) {
-            ForEach(FanControlMode.allCases) { mode in
+            ForEach([FanControlMode.auto, .autoTemp, .manualRPM]) { mode in
                 Text(mode.title).tag(mode)
             }
         }
@@ -67,58 +89,156 @@ struct ContentView: View {
             ManualRPMModeView()
                 .environmentObject(daemon)
         case .autoTemp:
-            AutoTempModeView()
+            AutoTempModeView(temperatureUnit: temperatureUnit)
                 .environmentObject(daemon)
         }
     }
 
     private var offlineView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 7) {
             Image(systemName: "fanblades.slash")
-                .font(.system(size: 34))
+                .font(.system(size: 30))
                 .foregroundColor(.secondary)
-            Text("Daemon is not running")
+            Text("FanControl needs setup")
                 .font(.headline)
-            Text("Install or update the privileged helper")
+            Text("Open settings to install or update the helper.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Button(daemon.isInstalling ? "Installing..." : "Install / Update") {
-                daemon.installOrUpdateDaemon()
+                .multilineTextAlignment(.center)
+            Button("Open Settings") {
+                showsSettings = true
             }
             .buttonStyle(.borderedProminent)
-            .disabled(daemon.isInstalling)
         }
-        .frame(maxWidth: .infinity, minHeight: 150)
+        .frame(maxWidth: .infinity, minHeight: 120)
+    }
+
+    private var settingsView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.headline)
+                Spacer()
+                Text("Manage helper and preferences")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Temperature Unit")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Picker("Temperature Unit", selection: $temperatureUnitRaw) {
+                    ForEach(TemperatureUnit.allCases) { unit in
+                        Text(unit.title).tag(unit.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+            .settingsCard()
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Helper")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                helperVersionView
+                Button(daemon.isInstalling ? "Installing..." : installButtonTitle) {
+                    daemon.installOrUpdateDaemon()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(daemon.isInstalling || daemon.isUninstalling)
+                if daemon.daemonOnline, daemon.helperVersion != nil {
+                    Button(daemon.isUninstalling ? "Removing..." : "Uninstall Helper") {
+                        daemon.confirmAndUninstallDaemon()
+                    }
+                    .foregroundColor(.red)
+                    .disabled(daemon.isInstalling || daemon.isUninstalling)
+                }
+            }
+            .settingsCard()
+
+            Button("Quit FanControl") {
+                daemon.quit()
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+        }
+    }
+
+    private var helperVersionView: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("App version: \(daemon.bundledVersion)")
+            Text("Helper version: \(daemon.helperVersion ?? "not installed")")
+            if daemon.helperNeedsUpdate && daemon.daemonOnline {
+                Text("Update available")
+                    .foregroundColor(.orange)
+            }
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
     }
 
     private var footerView: some View {
-        HStack {
-            Text(daemon.statusMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Spacer()
-            Button(daemon.isInstalling ? "Installing..." : installButtonTitle) {
-                daemon.installOrUpdateDaemon()
+        HStack(spacing: 8) {
+            Button {
+                showsSettings.toggle()
+            } label: {
+                Image(systemName: showsSettings ? "xmark" : "gearshape")
+                    .font(.system(size: 12, weight: .semibold))
             }
             .buttonStyle(.plain)
-            .font(.caption)
-            .disabled(daemon.isInstalling)
+            .help(showsSettings ? "Close settings" : "Settings")
+            Spacer()
             Button("Quit") {
                 daemon.quit()
             }
             .buttonStyle(.plain)
-            .font(.caption)
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.red)
         }
     }
 
-    private var temperatureText: String {
-        guard let averageTemperature = daemon.averageTemperature else { return "-- C" }
-        return "\(Int(averageTemperature.rounded())) C"
+    private var rpmSummaryTitle: String {
+        switch daemon.controlMode {
+        case .auto: return "Fan RPM"
+        case .manualRPM: return "Target RPM"
+        case .autoTemp: return "Auto RPM"
+        }
+    }
+
+    private var rpmSummaryText: String {
+        guard let rpm = rpmSummaryValue else { return "--" }
+        return "\(rpm)"
+    }
+
+    private var rpmSummaryValue: Int? {
+        if daemon.controlMode == .autoTemp, let autoRPM = daemon.autoTemperatureRPM {
+            return autoRPM
+        }
+        let values = daemon.fans.compactMap { fan -> Int? in
+            if fan.currentRPM > 0 {
+                return fan.currentRPM
+            }
+            return fan.rpm > 0 ? fan.rpm : nil
+        }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / values.count
     }
 
     private var installButtonTitle: String {
-        daemon.daemonOnline ? "Update" : "Install"
+        if !daemon.daemonOnline {
+            return "Install Helper"
+        }
+        guard daemon.helperVersion != nil else {
+            return "Install Helper"
+        }
+        return daemon.helperNeedsUpdate ? "Update Helper" : "Reinstall Helper"
+    }
+
+    private func temperatureText(_ celsius: Double?) -> String {
+        guard let celsius else { return "-- \(temperatureUnit.symbol)" }
+        return "\(Int(temperatureUnit.convert(celsius).rounded())) \(temperatureUnit.symbol)"
     }
 }
 
@@ -126,16 +246,12 @@ struct AutoModeView: View {
     @EnvironmentObject var daemon: DaemonManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("macOS controls the fans automatically", systemImage: "checkmark.circle.fill")
+        VStack(alignment: .leading, spacing: 6) {
+            Label("macOS is controlling fan speed", systemImage: "checkmark.circle.fill")
                 .foregroundColor(.green)
-            Text("Use this mode for normal daily work. Manual RPM and temperature target controls are disabled.")
+            Text("FanControl is not overriding RPM in this mode.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Button("Apply Auto Mode") {
-                daemon.setAutoAll()
-            }
-            .buttonStyle(.borderedProminent)
         }
         .modeCard()
     }
@@ -143,20 +259,22 @@ struct AutoModeView: View {
 
 struct AutoTempModeView: View {
     @EnvironmentObject var daemon: DaemonManager
+    let temperatureUnit: TemperatureUnit
+
     @State private var targetTemperature = 0.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Target notebook temperature")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Target temperature")
                         .font(.subheadline.weight(.semibold))
-                    Text("Daemon adjusts RPM automatically")
+                    Text("Fans adjust automatically")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Text("\(Int(targetTemperature.rounded())) C")
+                Text(formattedTemperature(targetTemperature))
                     .font(.title3.monospacedDigit().weight(.semibold))
             }
 
@@ -171,7 +289,7 @@ struct AutoTempModeView: View {
                     }
                 }
             } else {
-                Text("Waiting for daemon config...")
+                Text("Waiting for helper config...")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -190,29 +308,51 @@ struct AutoTempModeView: View {
             targetTemperature = newValue
         }
     }
+
+    private func formattedTemperature(_ celsius: Double) -> String {
+        "\(Int(temperatureUnit.convert(celsius).rounded())) \(temperatureUnit.symbol)"
+    }
 }
 
 struct ManualRPMModeView: View {
     @EnvironmentObject var daemon: DaemonManager
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 7) {
             Toggle("Separate fans", isOn: $daemon.separateFans)
                 .toggleStyle(.switch)
+                .onChange(of: daemon.separateFans) { _ in
+                    AppDelegate.requestPanelResize()
+                }
 
             if daemon.separateFans {
-                ForEach(daemon.fans) { fan in
-                    FanSliderView(
-                        fan: fan,
-                        onRpmChange: { rpm in
-                            daemon.setFan(index: fan.index, rpm: rpm)
+                if daemon.fans.count <= 2 {
+                    VStack(spacing: 7) {
+                        separateFanSliders
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 7) {
+                            separateFanSliders
                         }
-                    )
+                    }
+                    .frame(maxHeight: 260)
                 }
             } else {
                 CommonFanSliderView()
                     .environmentObject(daemon)
             }
+        }
+    }
+
+    private var separateFanSliders: some View {
+        ForEach(daemon.fans) { fan in
+            FanSliderView(
+                fan: fan,
+                onRpmChange: { rpm in
+                    daemon.setFan(index: fan.index, rpm: rpm)
+                }
+            )
         }
     }
 }
@@ -274,9 +414,9 @@ struct FanSliderShell: View {
     let onRpmChange: (Int) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                     if let currentRPM {
@@ -321,9 +461,41 @@ struct FanSliderShell: View {
     }
 }
 
+enum TemperatureUnit: String, CaseIterable, Identifiable {
+    case celsius
+    case fahrenheit
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .celsius: return "°C"
+        case .fahrenheit: return "°F"
+        }
+    }
+
+    var symbol: String { title }
+
+    func convert(_ celsius: Double) -> Double {
+        switch self {
+        case .celsius:
+            return celsius
+        case .fahrenheit:
+            return celsius * 9 / 5 + 32
+        }
+    }
+}
+
 private extension View {
     func modeCard() -> some View {
-        padding(10)
+        padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    func settingsCard() -> some View {
+        padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

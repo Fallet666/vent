@@ -37,6 +37,13 @@ void TestSplitCommand() {
     Expect(parts[2] == "55", "split_command value token");
 }
 
+void TestDaemonConstants() {
+    Expect(std::string(APP_VERSION).find('.') != std::string::npos,
+           "APP_VERSION should be a visible release version");
+    Expect(std::string(DAEMON_SOCKET_PATH) == "/tmp/fanctl.sock", "daemon socket path should stay stable");
+    Expect(std::string(DAEMON_PID_PATH) == "/tmp/fanctld.pid", "daemon pid path should stay stable");
+}
+
 void TestTemperatureConfig() {
     Expect(is_temperature_usable("TC0P", 45.0f), "TC0P at 45C should be usable");
     Expect(!is_temperature_usable("TC0P", MIN_USABLE_TEMPERATURE_C - 1.0f), "low temperature should be ignored");
@@ -72,6 +79,7 @@ void TestByteConversions() {
 
 int main() {
     TestSplitCommand();
+    TestDaemonConstants();
     TestTemperatureConfig();
     TestByteConversions();
     std::cout << "unit_tests: OK\n";

@@ -1,33 +1,46 @@
-# Mac Fan Control
+# FanControl for macOS
 
-Small macOS fan-control utility with a root daemon, CLI, and menu-bar GUI.
+[![CI](https://github.com/Fallet666/mac-manual-rpm/actions/workflows/ci.yml/badge.svg)](https://github.com/Fallet666/mac-manual-rpm/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/Fallet666/mac-manual-rpm)](https://github.com/Fallet666/mac-manual-rpm/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The project is aimed at modern MacBooks, including Apple Silicon machines where direct SMC writes require a privileged daemon.
+A free, open-source menu-bar fan control app for MacBooks.
+
+FanControl gives you simple manual RPM control, automatic temperature-based cooling, and a safe one-click return to macOS automatic fan management. It is built for modern macOS, including Apple Silicon Macs where fan writes require a privileged helper daemon.
+
+[Download the latest DMG](https://github.com/Fallet666/mac-manual-rpm/releases/latest)
+
+## Why FanControl
+
+- Keep your MacBook cooler during heavy work, gaming, rendering, coding, or external-display use.
+- Set both fans together or control each fan separately when your Mac exposes multiple fans.
+- Use real fan limits reported by SMC instead of hardcoded RPM sliders.
+- Run everything from the menu bar without keeping a full app window open.
+- Stay in control: `Auto` mode immediately returns fan management to macOS.
+- No accounts, no telemetry, no subscriptions, no paid upgrade.
 
 ## Features
 
-- Menu-bar app with three exclusive modes: `Auto`, `Manual RPM`, and `Auto Temp`.
-- Controls all detected fans; no hardcoded fan count.
-- Uses SMC fan min/max RPM ranges instead of fixed slider limits.
-- Shows average temperature from available SMC temperature sensors.
-- Root launchd daemon keeps fan settings active while the GUI is closed.
-- CLI for reading/writing SMC keys, listing fans/sensors, and daemon control.
-
-## Build
-
-```bash
-cmake -S . -B build
-cmake --build build
-
-cd gui/FanControlGUI
-swift build -c release
-```
+- Menu-bar UI with three clear modes: `Auto`, `Manual RPM`, and `Auto Temp`.
+- Automatic fan detection with no hardcoded fan count.
+- Real per-device min/max RPM ranges from SMC.
+- Average temperature display from available SMC sensors.
+- Privileged launchd helper keeps fan settings active while the GUI is closed.
+- Built-in `Install / Update` button for the helper daemon.
+- Built-in `Uninstall` action for removing the privileged helper.
+- Helper version display in the menu-bar popover.
+- CLI for advanced users and diagnostics.
+- GitHub Actions CI and release DMG builds.
 
 ## Install
 
-Download the latest DMG from GitHub Releases, open it, and drag `FanControl.app` to `Applications`.
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Fallet666/mac-manual-rpm/releases/latest).
+2. Open the DMG and drag `FanControl.app` to `Applications`.
+3. Open `FanControl.app` and click `Install / Update` in the menu-bar popover.
 
-Then open `FanControl.app` from Applications and click `Install / Update` in the menu-bar popover. macOS will ask for an administrator password because the privileged daemon lives in `/Library/LaunchDaemons` and writes to `/usr/local/bin`.
+macOS will ask for an administrator password because FanControl installs a privileged helper daemon into `/Library/LaunchDaemons` and command-line tools into `/usr/local/bin`.
+
+To remove the privileged helper later, open FanControl and click `Uninstall`. The app switches fans back to `Auto`, stops the daemon, and removes installed helper binaries.
 
 The app is ad-hoc signed but not Apple-notarized yet. If macOS blocks it, right-click `FanControl.app` and choose `Open`. If Finder says the app is damaged after downloading, remove the quarantine flag:
 
@@ -35,55 +48,125 @@ The app is ad-hoc signed but not Apple-notarized yet. If macOS blocks it, right-
 xattr -dr com.apple.quarantine /Applications/FanControl.app
 ```
 
-For local development, build and install the app bundle manually:
+## How To Use
+
+After launching FanControl, click the fan icon in the macOS menu bar.
+
+### Auto
+
+Use `Auto` when you want macOS and SMC to control the fans normally. This is the safest fallback and the recommended default when you do not need manual cooling.
+
+### Manual RPM
+
+Use `Manual RPM` when you want a fixed fan speed.
+
+- Turn off `Separate fans` to move all fans together.
+- Turn on `Separate fans` to tune each detected fan independently.
+- Sliders use the real RPM range reported by your Mac.
+
+### Auto Temp
+
+Use `Auto Temp` when you want to pick a target laptop temperature instead of a raw RPM value. The daemon watches available temperature sensors and adjusts fan speed automatically.
+
+## Safety Notes
+
+- FanControl does not disable macOS thermal protection.
+- `Auto` mode is always available and returns control to macOS.
+- The daemon has a watchdog for manual RPM control.
+- Temperature sensors and fan behavior vary across Mac models and macOS releases.
+- If anything looks wrong, switch to `Auto` or quit the app.
+
+## Privacy
+
+FanControl does not collect analytics, send telemetry, create accounts, or talk to external servers during normal use. The app only communicates with its local helper daemon through a Unix socket at `/tmp/fanctl.sock`.
+
+## Compatibility
+
+The project is designed around capability detection rather than a hardcoded Mac model list.
+
+Known design goals:
+
+- Apple Silicon MacBooks.
+- Intel MacBooks where SMC fan keys are available.
+- Any number of detected fans.
+- Real SMC min/max fan limits.
+
+Fan control behavior can differ between Mac models. If your model behaves differently, please open an issue with your Mac model, macOS version, and the output of the diagnostics commands below.
+
+## Troubleshooting
+
+### The app says the daemon is offline
+
+Open the menu-bar popover and click `Install / Update`. If it still fails, check the logs:
 
 ```bash
-sudo ./install.sh
-open /Applications/FanControl.app
+tail -f /var/log/fanctl.err
 ```
 
-To build a distributable DMG locally:
+### macOS says the app is damaged
+
+This is Gatekeeper quarantine on a non-notarized build:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FanControl.app
+```
+
+Then right-click `FanControl.app` and choose `Open`.
+
+### The menu-bar icon is hidden
+
+macOS, Bartender, Hidden Bar, or similar utilities can hide status-bar items. Check your menu-bar overflow/hidden-items settings.
+
+### Fans do not react immediately
+
+Some Macs and macOS versions reconcile fan state aggressively. Keep the app in `Manual RPM` or `Auto Temp` for a few seconds and check daemon logs if the fan target does not change.
+
+## CLI
+
+Advanced users can use `fanctl` after installing the helper:
+
+```bash
+fanctl list
+fanctl temps
+fanctl daemon status
+fanctl persist-all 2500
+fanctl unpersist-all
+fanctl read F0Ac
+```
+
+Direct SMC writes normally require root. Prefer daemon-backed commands for normal use because the daemon runs with the required privileges and keeps settings reconciled.
+
+## Build From Source
+
+Requirements:
+
+- macOS
+- Xcode Command Line Tools
+- CMake
+- Swift Package Manager
+
+```bash
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+
+cd gui/FanControlGUI
+swift build -c release
+```
+
+Build a distributable DMG locally:
 
 ```bash
 ./package_dmg.sh
 open dist/FanControl-*.dmg
 ```
 
-The installer:
-
-- Builds C++ binaries and the Swift GUI.
-- Installs `fanctl` and `fanctld` into `/usr/local/bin`.
-- Creates `/Applications/FanControl.app`.
-- Bundles `fanctl` and `fanctld` inside the app for future GUI-driven daemon updates.
-- Installs the daemon as `/Library/LaunchDaemons/com.fanctl.daemon.plist`.
-- Writes daemon logs to `/var/log/fanctl.log` and `/var/log/fanctl.err`.
-
-## GUI Modes
-
-- `Auto`: returns fans to macOS/SMC automatic control.
-- `Manual RPM`: sets fan RPM manually, either all fans together or separately.
-- `Auto Temp`: daemon targets a desired notebook temperature and adjusts RPM automatically.
-
-The daemon exposes runtime config through its socket protocol, so the GUI receives temperature limits from the daemon instead of duplicating hardcoded values.
-
-## CLI Examples
+Install from a local build:
 
 ```bash
-./build/fanctl list
-./build/fanctl temps
-./build/fanctl read F0Ac
-./build/fanctl persist-all 2500
-./build/fanctl unpersist-all
-./build/fanctl daemon status
+sudo ./install.sh
+open /Applications/FanControl.app
 ```
-
-Direct SMC writes usually require root:
-
-```bash
-sudo ./build/fanctl write F0Tg 2500
-```
-
-Prefer daemon-backed commands for normal use because the daemon runs as root and reconciles settings continuously.
 
 ## Daemon Protocol
 
@@ -94,6 +177,7 @@ Supported commands include:
 - `FANS`
 - `TEMPS`
 - `CONFIG`
+- `VERSION`
 - `MODE AUTO`
 - `MODE MANUAL`
 - `MODE TEMP <targetC>`
@@ -102,40 +186,41 @@ Supported commands include:
 - `SETALL <rpm>`
 - `AUTO <fanIndex>`
 - `AUTOALL`
+- `WRITE <key> <value>`
 - `HEARTBEAT`
 
 The Swift GUI can override the socket path with `FANCTL_SOCKET_PATH`.
 
-## Tests And CI
+## Project Status
 
-Run local non-root unit tests:
+FanControl is young but usable. The current priority is making installation, model compatibility, and safety behavior excellent before adding advanced automation.
 
-```bash
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
+Planned work:
 
-GitHub Actions runs the C++ build, C++ unit tests, and Swift GUI build on macOS. Pushing a tag like `v1.0.0` builds a DMG and publishes it to GitHub Releases.
+- Developer ID signing and Apple notarization.
+- Better first-run onboarding.
+- Temperature/fan history charts.
+- Per-mode presets.
+- Safer model compatibility reporting.
+- Automatic update checks.
+- More tests around daemon protocol and temperature control.
 
-## Diagnostics
+See [`docs/LAUNCH_PLAN.md`](docs/LAUNCH_PLAN.md) for the product roadmap, Reddit launch draft, and promotion plan.
 
-Check daemon logs:
+## Contributing
 
-```bash
-tail -f /var/log/fanctl.err
-```
+Issues, compatibility reports, UI feedback, and pull requests are welcome.
 
-Check daemon socket manually:
+Please use the GitHub compatibility report template when testing a new Mac model.
 
-```bash
-printf 'FANS\n' | nc -U /tmp/fanctl.sock
-printf 'TEMPS\n' | nc -U /tmp/fanctl.sock
-```
+Useful information for compatibility reports:
 
-## Notes
+- Mac model and year.
+- macOS version.
+- Apple Silicon or Intel.
+- Number of detected fans.
+- Output of `fanctl list`, `fanctl temps`, and `fanctl daemon status`.
 
-- Fan control behavior differs across Mac models and macOS versions.
-- The backend detects capabilities from SMC keys where possible, instead of relying on a hardcoded model list.
-- Some temperature keys can report misleading low values; the daemon filters known suspicious sensor families and invalid ranges.
-- Apple can change SMC behavior in macOS updates, so keep `Auto` mode available as the safe fallback.
+## License
+
+MIT. See [`LICENSE`](LICENSE).

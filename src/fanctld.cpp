@@ -357,6 +357,8 @@ int main(int argc, char** argv) {
                         } else if (cmd == "HEARTBEAT") {
                             last_heartbeat = now;
                             response = "OK";
+                        } else if (cmd == "VERSION") {
+                            response = "VERSION " + std::string(APP_VERSION);
                         } else if (cmd == "MODESTATUS") {
                             response = "MODE " + std::string(control_mode_to_string(control_mode)) + " " +
                                 std::to_string(target_temperature) + " " +

@@ -57,6 +57,13 @@ final class DaemonClient {
         sendCommand("HEARTBEAT")?.hasPrefix("OK") == true
     }
 
+    func version() -> String? {
+        guard let response = sendCommand("VERSION") else { return nil }
+        let parts = response.split(separator: " ", maxSplits: 1)
+        guard parts.count == 2, parts[0] == "VERSION" else { return nil }
+        return String(parts[1])
+    }
+
     func fans() -> [DaemonFanInfo]? {
         guard let response = sendCommand("FANS") else { return nil }
 
