@@ -29,6 +29,12 @@ Download the latest DMG from GitHub Releases, open it, and drag `FanControl.app`
 
 Then open `FanControl.app` from Applications and click `Install / Update` in the menu-bar popover. macOS will ask for an administrator password because the privileged daemon lives in `/Library/LaunchDaemons` and writes to `/usr/local/bin`.
 
+The app is ad-hoc signed but not Apple-notarized yet. If macOS blocks it, right-click `FanControl.app` and choose `Open`. If Finder says the app is damaged after downloading, remove the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FanControl.app
+```
+
 For local development, build and install the app bundle manually:
 
 ```bash
