@@ -1,4 +1,5 @@
 #include "fan_controller.h"
+#include "fan_control_config.h"
 #include <thread>
 #include <chrono>
 #include <algorithm>
@@ -89,13 +90,9 @@ std::vector<TemperatureInfo> FanController::list_temperatures() {
 std::optional<float> FanController::get_cpu_temperature() {
     if (!is_available()) return std::nullopt;
 
-    // Common CPU temperature keys
-    const char* cpu_keys[] = {"TC0P", "TC0p", "TC0c", "TC0F", "TC0D", "TC1p"};
-    for (const auto& key : cpu_keys) {
-        auto val = backend_->read_key(key);
-        if (val) {
-            float temp = bytes_to_float(val->bytes, val->data_type, val->data_size);
-            if (temp > 0.0f) return temp;
+    for (const auto& temperature : backend_->get_all_temperatures()) {
+        if (temperature.key.rfind("TC", 0) == 0 && is_temperature_usable(temperature.key, temperature.value)) {
+            return temperature.value;
         }
     }
 
@@ -105,13 +102,9 @@ std::optional<float> FanController::get_cpu_temperature() {
 std::optional<float> FanController::get_gpu_temperature() {
     if (!is_available()) return std::nullopt;
 
-    // Common GPU temperature keys
-    const char* gpu_keys[] = {"TG0P", "TG0p", "TG0D", "TG0H", "TG1p"};
-    for (const auto& key : gpu_keys) {
-        auto val = backend_->read_key(key);
-        if (val) {
-            float temp = bytes_to_float(val->bytes, val->data_type, val->data_size);
-            if (temp > 0.0f) return temp;
+    for (const auto& temperature : backend_->get_all_temperatures()) {
+        if (temperature.key.rfind("TG", 0) == 0 && is_temperature_usable(temperature.key, temperature.value)) {
+            return temperature.value;
         }
     }
 

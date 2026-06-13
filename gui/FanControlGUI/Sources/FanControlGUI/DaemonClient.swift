@@ -3,7 +3,7 @@ import Foundation
 
 final class DaemonClient {
     static let shared = DaemonClient()
-    private let sockPath = "/tmp/fanctl.sock"
+    private let sockPath = ProcessInfo.processInfo.environment["FANCTL_SOCKET_PATH"] ?? "/tmp/fanctl.sock"
 
     private init() {}
 
@@ -117,6 +117,27 @@ final class DaemonClient {
         )
     }
 
+    func config() -> DaemonConfig? {
+        guard let response = sendCommand("CONFIG") else { return nil }
+        let parts = response.split(separator: " ")
+        guard parts.count >= 6,
+              parts[0] == "CONFIG",
+              let minTargetTemperature = Double(parts[1]),
+              let maxTargetTemperature = Double(parts[2]),
+              let defaultTargetTemperature = Double(parts[3]),
+              let minUsableTemperature = Double(parts[4]),
+              let maxUsableTemperature = Double(parts[5]) else {
+            return nil
+        }
+        return DaemonConfig(
+            minTargetTemperature: minTargetTemperature,
+            maxTargetTemperature: maxTargetTemperature,
+            defaultTargetTemperature: defaultTargetTemperature,
+            minUsableTemperature: minUsableTemperature,
+            maxUsableTemperature: maxUsableTemperature
+        )
+    }
+
     @discardableResult
     func setMode(_ mode: FanControlMode, targetTemperature: Double? = nil) -> Bool {
         switch mode {
@@ -125,7 +146,8 @@ final class DaemonClient {
         case .manualRPM:
             return sendCommand("MODE MANUAL")?.hasPrefix("OK") == true
         case .autoTemp:
-            let temperature = Int((targetTemperature ?? 55).rounded())
+            guard let targetTemperature else { return false }
+            let temperature = Int(targetTemperature.rounded())
             return sendCommand("MODE TEMP \(temperature)")?.hasPrefix("OK") == true
         }
     }
@@ -195,4 +217,12 @@ struct DaemonModeStatus {
     let targetTemperature: Double
     let averageTemperature: Double?
     let autoRPM: Int?
+}
+
+struct DaemonConfig {
+    let minTargetTemperature: Double
+    let maxTargetTemperature: Double
+    let defaultTargetTemperature: Double
+    let minUsableTemperature: Double
+    let maxUsableTemperature: Double
 }

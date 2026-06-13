@@ -1,5 +1,6 @@
 #include "smc_backend.h"
 #include "daemon_ipc.h"
+#include "fan_control_config.h"
 #include <iostream>
 #include <cstring>
 #include <cstdio>
@@ -55,9 +56,7 @@ static float average_temperature(const std::vector<TemperatureInfo>& temperature
     float sum = 0.0f;
     int count = 0;
     for (const auto& temperature : temperatures) {
-        if (temperature.value >= 20.0f && temperature.value < 130.0f &&
-            temperature.key.rfind("Ta", 0) != 0 && temperature.key.rfind("Tp", 0) != 0)
-        {
+        if (is_temperature_usable(temperature.key, temperature.value)) {
             sum += temperature.value;
             ++count;
         }
@@ -91,9 +90,28 @@ static float rpm_for_temperature(float current_temperature, float target_tempera
     if (max_speed <= min_speed) {
         return min_speed;
     }
-    float normalized = (current_temperature - target_temperature + 3.0f) / 25.0f;
+    float normalized = (current_temperature - target_temperature + AUTO_TEMPERATURE_RESPONSE_OFFSET_C) /
+        AUTO_TEMPERATURE_FULL_SPEED_SPAN_C;
     normalized = std::clamp(normalized, 0.0f, 1.0f);
     return min_speed + (max_speed - min_speed) * normalized;
+}
+
+static bool write_raw_key(SMCBackend& backend, const std::string& key, float value) {
+    if (key.size() != 4) {
+        return false;
+    }
+
+    auto current = backend.read_key(key.c_str());
+    if (!current) {
+        return false;
+    }
+
+    SMCValue write_value{};
+    std::strncpy(write_value.key, key.c_str(), 4);
+    write_value.data_size = current->data_size;
+    write_value.data_type = current->data_type;
+    float_to_bytes(value, write_value.bytes, current->data_type, current->data_size);
+    return backend.write_key(write_value);
 }
 
 int main(int argc, char** argv) {
@@ -116,8 +134,7 @@ int main(int argc, char** argv) {
     std::cerr << "SMC opened: " << backend->get_platform_name() << "\n";
 
     // Single-instance guard via PID file
-    const char* PID_FILE = "/tmp/fanctld.pid";
-    int pid_fd = open(PID_FILE, O_CREAT | O_WRONLY, 0644);
+    int pid_fd = open(DAEMON_PID_PATH, O_CREAT | O_WRONLY, 0644);
     if (pid_fd >= 0) {
         struct flock fl = {};
         fl.l_type = F_WRLCK;
@@ -175,7 +192,7 @@ int main(int argc, char** argv) {
     uint64_t last_reconciliation = 0;
     uint64_t last_temperature_control = 0;
     ControlMode control_mode = ControlMode::Auto;
-    float target_temperature = 55.0f;
+    float target_temperature = DEFAULT_TARGET_TEMPERATURE_C;
     float last_average_temperature = 0.0f;
     float last_auto_temperature_rpm = 0.0f;
 
@@ -283,6 +300,11 @@ int main(int argc, char** argv) {
                             }
                             last_heartbeat = now;
                             response = "OK";
+                        } else if (cmd == "WRITE" && parts.size() >= 3) {
+                            const std::string& key = parts[1];
+                            float value = std::stof(parts[2]);
+                            bool ok = write_raw_key(*backend, key, value);
+                            response = ok ? "OK" : "ERR Failed to write key";
                         } else if (cmd == "AUTO" && parts.size() >= 2) {
                             uint32_t fan_idx = std::stoul(parts[1]);
                             // Revert immediately
@@ -320,7 +342,11 @@ int main(int argc, char** argv) {
                                 control_mode = ControlMode::ManualRPM;
                                 response = "OK";
                             } else if (parts[1] == "TEMP" && parts.size() >= 3) {
-                                target_temperature = std::clamp(std::stof(parts[2]), 20.0f, 95.0f);
+                                target_temperature = std::clamp(
+                                    std::stof(parts[2]),
+                                    MIN_TARGET_TEMPERATURE_C,
+                                    MAX_TARGET_TEMPERATURE_C
+                                );
                                 control_mode = ControlMode::AutoTemp;
                                 last_temperature_control = 0;
                                 response = "OK";
@@ -336,6 +362,12 @@ int main(int argc, char** argv) {
                                 std::to_string(target_temperature) + " " +
                                 std::to_string(last_average_temperature) + " " +
                                 std::to_string(last_auto_temperature_rpm);
+                        } else if (cmd == "CONFIG") {
+                            response = "CONFIG " + std::to_string(MIN_TARGET_TEMPERATURE_C) + " " +
+                                std::to_string(MAX_TARGET_TEMPERATURE_C) + " " +
+                                std::to_string(DEFAULT_TARGET_TEMPERATURE_C) + " " +
+                                std::to_string(MIN_USABLE_TEMPERATURE_C) + " " +
+                                std::to_string(MAX_USABLE_TEMPERATURE_C);
                         } else if (cmd == "FANS") {
                             auto fans = backend->get_all_fans();
                             response = "FANS " + std::to_string(fans.size());
@@ -394,7 +426,9 @@ int main(int argc, char** argv) {
         }
 
         // --- Auto temperature control (every 2 seconds) ---
-        if (control_mode == ControlMode::AutoTemp && (now - last_temperature_control >= 2000)) {
+        if (control_mode == ControlMode::AutoTemp &&
+            (now - last_temperature_control >= static_cast<uint64_t>(AUTO_TEMPERATURE_INTERVAL_MS)))
+        {
             last_temperature_control = now;
             auto temperatures = backend->get_all_temperatures();
             auto fans = backend->get_all_fans();

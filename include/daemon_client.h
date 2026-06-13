@@ -16,6 +16,7 @@ bool daemon_send_command(const std::string& command, std::string* response_out =
 bool daemon_send_set(uint32_t index, float speed_rpm);
 bool daemon_send_set_percent(uint32_t index, float percent);
 bool daemon_send_set_all(float speed_rpm);
+bool daemon_send_write_key(const std::string& key, float value);
 bool daemon_send_auto(uint32_t index);
 bool daemon_send_auto_all();
 bool daemon_send_heartbeat();

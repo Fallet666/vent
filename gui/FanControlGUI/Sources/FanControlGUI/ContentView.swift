@@ -79,11 +79,16 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
             Text("Daemon is not running")
                 .font(.headline)
-            Text("Run ./install.sh from the project folder")
+            Text("Install or update the privileged helper")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            Button(daemon.isInstalling ? "Installing..." : "Install / Update") {
+                daemon.installOrUpdateDaemon()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(daemon.isInstalling)
         }
-        .frame(maxWidth: .infinity, minHeight: 130)
+        .frame(maxWidth: .infinity, minHeight: 150)
     }
 
     private var footerView: some View {
@@ -93,6 +98,12 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
             Spacer()
+            Button(daemon.isInstalling ? "Installing..." : installButtonTitle) {
+                daemon.installOrUpdateDaemon()
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .disabled(daemon.isInstalling)
             Button("Quit") {
                 daemon.quit()
             }
@@ -104,6 +115,10 @@ struct ContentView: View {
     private var temperatureText: String {
         guard let averageTemperature = daemon.averageTemperature else { return "-- C" }
         return "\(Int(averageTemperature.rounded())) C"
+    }
+
+    private var installButtonTitle: String {
+        daemon.daemonOnline ? "Update" : "Install"
     }
 }
 
@@ -128,7 +143,7 @@ struct AutoModeView: View {
 
 struct AutoTempModeView: View {
     @EnvironmentObject var daemon: DaemonManager
-    @State private var targetTemperature = 55.0
+    @State private var targetTemperature = 0.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -145,10 +160,20 @@ struct AutoTempModeView: View {
                     .font(.title3.monospacedDigit().weight(.semibold))
             }
 
-            Slider(value: $targetTemperature, in: 20...95, step: 1) { editing in
-                if !editing {
-                    daemon.setTargetTemperature(targetTemperature)
+            if let config = daemon.config {
+                Slider(
+                    value: $targetTemperature,
+                    in: config.minTargetTemperature...config.maxTargetTemperature,
+                    step: 1
+                ) { editing in
+                    if !editing {
+                        daemon.setTargetTemperature(targetTemperature)
+                    }
                 }
+            } else {
+                Text("Waiting for daemon config...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             HStack {

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(mac_fan_control VERSION 1.0.0 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -41,6 +43,14 @@ add_executable(fanctld
     src/daemon_ipc.cpp
 )
 target_link_libraries(fanctld PRIVATE fan_control)
+
+if(BUILD_TESTING)
+    add_executable(unit_tests
+        tests/unit_tests.cpp
+    )
+    target_link_libraries(unit_tests PRIVATE fan_control)
+    add_test(NAME unit_tests COMMAND unit_tests)
+endif()
 
 # Install targets
 install(TARGETS fan_control fanctl fanctld

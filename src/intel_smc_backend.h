@@ -124,9 +124,10 @@ private:
 
     bool write_key_u8(const char* key_str, uint8_t value);
     bool write_key_flt(const char* key_str, float value);
-    bool apply_apple_silicon_manual(uint32_t index, bool manual);
-    bool apply_apple_silicon_manual_and_target(uint32_t index, float target_speed);
-    void apply_apple_silicon_revert(uint32_t index);
+    bool uses_fan_mode_keys();
+    bool apply_keyed_manual_mode(uint32_t index, bool manual);
+    bool apply_keyed_manual_and_target(uint32_t index, float target_speed);
+    void apply_keyed_revert(uint32_t index);
 };
 
 } // namespace mac_fan_control

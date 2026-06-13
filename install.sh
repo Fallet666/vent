@@ -3,6 +3,9 @@ set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESOURCE_DIR="$PROJECT_DIR/gui/FanControlGUI/Sources/FanControlGUI/Resources"
+APP_DIR="/Applications/FanControl.app"
+DAEMON_SOCKET_PATH="/tmp/fanctl.sock"
+DAEMON_PID_PATH="/tmp/fanctld.pid"
 
 echo "=== Building C++ binaries ==="
 cmake --build "$PROJECT_DIR/build"
@@ -15,7 +18,6 @@ cd "$PROJECT_DIR"
 
 echo ""
 echo "=== Creating .app bundle ==="
-APP_DIR="/Applications/FanControl.app"
 sudo rm -rf "$APP_DIR"
 sudo mkdir -p "$APP_DIR/Contents/MacOS"
 sudo mkdir -p "$APP_DIR/Contents/Resources"
@@ -54,7 +56,10 @@ sudo cp "$PROJECT_DIR/gui/FanControlGUI/.build/release/FanControlGUI" "$APP_DIR/
 sudo cp "$RESOURCE_DIR/MacFanControl.icns" "$APP_DIR/Contents/Resources/MacFanControl.icns"
 sudo cp "$RESOURCE_DIR/MacFanMenuBarTemplate.png" "$APP_DIR/Contents/Resources/MacFanMenuBarTemplate.png"
 sudo cp "$RESOURCE_DIR/MacFanMenuBarTemplate@2x.png" "$APP_DIR/Contents/Resources/MacFanMenuBarTemplate@2x.png"
+sudo cp "$PROJECT_DIR/build/fanctld" "$APP_DIR/Contents/Resources/fanctld"
+sudo cp "$PROJECT_DIR/build/fanctl" "$APP_DIR/Contents/Resources/fanctl"
 sudo chmod +x "$APP_DIR/Contents/MacOS/FanControlGUI"
+sudo chmod +x "$APP_DIR/Contents/Resources/fanctld" "$APP_DIR/Contents/Resources/fanctl"
 sudo chown -R root:wheel "$APP_DIR"
 
 echo ""
@@ -69,8 +74,8 @@ sudo chmod 755 /usr/local/bin/fanctld /usr/local/bin/fanctl
 # Kill old daemon
 sudo launchctl bootout system/com.fanctl.daemon 2>/dev/null || true
 sudo killall fanctld 2>/dev/null || true
-sudo rm -f /tmp/fanctl.sock
-sudo rm -f /tmp/fanctld.pid
+sudo rm -f "$DAEMON_SOCKET_PATH"
+sudo rm -f "$DAEMON_PID_PATH"
 sudo touch /var/log/fanctl.log /var/log/fanctl.err
 sudo chmod 644 /var/log/fanctl.log /var/log/fanctl.err
 

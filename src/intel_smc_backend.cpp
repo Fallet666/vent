@@ -1,5 +1,6 @@
 #include "intel_smc_backend.h"
 #include "daemon_ipc.h"
+#include "fan_control_config.h"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -41,7 +42,7 @@ std::vector<TemperatureInfo> read_powermetrics_temperatures() {
 
         char* end = nullptr;
         float value = std::strtof(cursor, &end);
-        if (end == cursor || value <= 0.0f || value >= 130.0f) continue;
+        if (end == cursor || !is_temperature_usable("PM", value)) continue;
 
         TemperatureInfo temperature;
         temperature.key = "PM" + std::to_string(temperature_index++);
@@ -51,13 +52,6 @@ std::vector<TemperatureInfo> read_powermetrics_temperatures() {
 
     pclose(pipe);
     return temperatures;
-}
-
-bool is_temperature_usable(const std::string& key, float value) {
-    if (value < 20.0f || value >= 130.0f) {
-        return false;
-    }
-    return key.rfind("Ta", 0) != 0 && key.rfind("Tp", 0) != 0;
 }
 
 } // namespace
@@ -100,7 +94,7 @@ std::string IntelSMCBackend::key_to_string(uint32_t key) const {
 bool IntelSMCBackend::initialize() {
     if (initialized_) return true;
 
-    // Detect Apple Silicon
+    // Detect platform for diagnostics only; behavior is capability-based below.
     char cpu_brand[256];
     size_t cpu_brand_len = sizeof(cpu_brand);
     if (sysctlbyname("machdep.cpu.brand_string", cpu_brand, &cpu_brand_len, nullptr, 0) == 0) {
@@ -115,7 +109,7 @@ bool IntelSMCBackend::initialize() {
     result = IOMainPort(kIOMainPortDefault, &master_port);
     if (result != kIOReturnSuccess) return false;
 
-    // Try different SMC service names for Intel and Apple Silicon
+    // Try known SMC service names across macOS platforms.
     const char* smc_services[] = {"AppleSMC", "AppleSMCKeysEndpoint"};
     device = 0;
 
@@ -375,7 +369,7 @@ std::optional<FanInfo> IntelSMCBackend::get_fan(uint32_t index) {
         uint32_t manual_mask = strtoul(reinterpret_cast<const char*>(fs_val->bytes), fs_val->data_size, 10);
         info.manual_mode = (manual_mask & (1 << index)) != 0;
     } else {
-        // Apple Silicon: check F%dMd key
+        // Some platforms expose per-fan mode keys instead of the FS! bitmask.
         char md_key[8];
         std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
         auto md_val = read_key(md_key);
@@ -437,7 +431,12 @@ bool IntelSMCBackend::write_key_flt(const char* key_str, float value) {
     return write_key(val);
 }
 
-bool IntelSMCBackend::apply_apple_silicon_manual(uint32_t index, bool manual) {
+bool IntelSMCBackend::uses_fan_mode_keys() {
+    auto fs_val = read_key("FS! ");
+    return !fs_val || fs_val->data_size == 0;
+}
+
+bool IntelSMCBackend::apply_keyed_manual_mode(uint32_t index, bool manual) {
     if (manual) {
         bool ok = write_key_u8("Ftst", 1);
         char md_key[8];
@@ -453,7 +452,7 @@ bool IntelSMCBackend::apply_apple_silicon_manual(uint32_t index, bool manual) {
     }
 }
 
-bool IntelSMCBackend::apply_apple_silicon_manual_and_target(uint32_t index, float target_speed) {
+bool IntelSMCBackend::apply_keyed_manual_and_target(uint32_t index, float target_speed) {
     bool ok = write_key_u8("Ftst", 1);
     char md_key[8];
     std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
@@ -464,7 +463,7 @@ bool IntelSMCBackend::apply_apple_silicon_manual_and_target(uint32_t index, floa
     return ok;
 }
 
-void IntelSMCBackend::apply_apple_silicon_revert(uint32_t index) {
+void IntelSMCBackend::apply_keyed_revert(uint32_t index) {
     char md_key[8];
     std::snprintf(md_key, sizeof(md_key), "F%dMd", index);
     write_key_u8(md_key, 0);
@@ -474,9 +473,8 @@ void IntelSMCBackend::apply_apple_silicon_revert(uint32_t index) {
 bool IntelSMCBackend::set_fan_target_speed(uint32_t index, float speed) {
     if (!initialized_) return false;
 
-    auto fs_val = read_key("FS! ");
-    if (!fs_val || fs_val->data_size == 0) {
-        return apply_apple_silicon_manual_and_target(index, speed);
+    if (uses_fan_mode_keys()) {
+        return apply_keyed_manual_and_target(index, speed);
     }
 
     // Intel path
@@ -513,20 +511,14 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
         return write_key(val);
     }
 
-    return apply_apple_silicon_manual(index, manual);
+    return apply_keyed_manual_mode(index, manual);
 }
 
 std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     std::vector<TemperatureInfo> temps;
     if (!initialized_) return temps;
 
-    const char* known_temperature_keys[] = {
-        "TC0P", "TC0E", "TC0F", "TC0D", "TC1C", "TC2C", "TC3C",
-        "TG0P", "TG0D", "TG1D", "TG0H", "Tm0P", "TB0T", "Th0H",
-        "Ts0P", "Ts0S"
-    };
-
-    for (const auto* key : known_temperature_keys) {
+    for (const auto* key : KNOWN_TEMPERATURE_KEYS) {
         auto value = read_key(key);
         if (!value) continue;
 
@@ -600,13 +592,12 @@ bool IntelSMCBackend::start_persistent_fan_control(uint32_t index, float target_
 
     control.thread = std::thread([this, index]() {
         auto& control = persistent_controls_[index];
-        auto fs_val = read_key("FS! ");
-        bool is_apple_silicon = (!fs_val || fs_val->data_size == 0);
+        bool uses_mode_keys = uses_fan_mode_keys();
 
         while (control.running.load()) {
             float target = control.target_speed.load();
-            if (is_apple_silicon) {
-                apply_apple_silicon_manual_and_target(index, target);
+            if (uses_mode_keys) {
+                apply_keyed_manual_and_target(index, target);
             } else {
                 set_fan_manual_mode(index, true);
                 char key[8];
@@ -625,7 +616,7 @@ bool IntelSMCBackend::start_persistent_fan_control(uint32_t index, float target_
         // Revert on exit
         auto fs_val_after = read_key("FS! ");
         if (!fs_val_after || fs_val_after->data_size == 0) {
-            apply_apple_silicon_revert(index);
+            apply_keyed_revert(index);
         } else {
             set_fan_manual_mode(index, false);
         }

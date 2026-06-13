@@ -4,6 +4,7 @@ build/
 *.dSYM/
 .DS_Store
 gui/FanControlGUI/.build/
+dist/
 
 # Build artifacts in project root
 CMakeCache.txt

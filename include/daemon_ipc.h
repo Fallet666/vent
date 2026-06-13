@@ -7,6 +7,7 @@
 namespace mac_fan_control {
 
 constexpr const char* DAEMON_SOCKET_PATH = "/tmp/fanctl.sock";
+constexpr const char* DAEMON_PID_PATH = "/tmp/fanctld.pid";
 constexpr int WATCHDOG_TIMEOUT_SECONDS = 10;
 constexpr int RECONCILIATION_INTERVAL_MS = 300;
 constexpr int HEARTBEAT_INTERVAL_MS = 2000;

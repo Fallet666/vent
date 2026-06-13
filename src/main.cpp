@@ -365,10 +365,18 @@ static void cmd_write(FanController& ctrl, int argc, char** argv) {
     std::string key = argv[0];
     float value = std::atof(argv[1]);
 
+    if (daemon_is_running()) {
+        if (daemon_send_write_key(key, value)) {
+            std::cout << "Key '" << key << "' set to " << value << " via daemon\n";
+            return;
+        }
+        std::cerr << "Daemon raw write failed. Falling back to direct SMC write...\n";
+    }
+
     if (ctrl.write_key(key, value)) {
         std::cout << "Key '" << key << "' set to " << value << "\n";
     } else {
-        std::cerr << "Failed to write key '" << key << "'.\n";
+        std::cerr << "Failed to write key '" << key << "'. Try running as root or install/start fanctld.\n";
     }
 }
 

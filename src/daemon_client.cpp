@@ -85,6 +85,11 @@ bool daemon_send_set_all(float speed_rpm) {
     return daemon_send_command(cmd);
 }
 
+bool daemon_send_write_key(const std::string& key, float value) {
+    std::string cmd = "WRITE " + key + " " + std::to_string(value);
+    return daemon_send_command(cmd);
+}
+
 bool daemon_send_auto(uint32_t index) {
     std::string cmd = "AUTO " + std::to_string(index);
     return daemon_send_command(cmd);
@@ -148,7 +153,11 @@ bool daemon_cmd_install(const std::vector<std::string>& /*args*/) {
         "set -e\n"
         "# Kill old daemon\n"
         "launchctl bootout system/com.fanctl.daemon 2>/dev/null || true\n"
-        "rm -f /tmp/fanctl.sock\n"
+        "killall fanctld 2>/dev/null || true\n"
+        "rm -f '" + std::string(DAEMON_SOCKET_PATH) + "'\n"
+        "rm -f '" + std::string(DAEMON_PID_PATH) + "'\n"
+        "touch /var/log/fanctl.log /var/log/fanctl.err\n"
+        "chmod 644 /var/log/fanctl.log /var/log/fanctl.err\n"
         "\n"
         "# Copy binary\n"
         "cp -f '" + fanctld_src + "' /usr/local/bin/fanctld 2>/dev/null || {\n"
@@ -175,14 +184,12 @@ bool daemon_cmd_install(const std::vector<std::string>& /*args*/) {
         "    <true/>\n"
         "    <key>KeepAlive</key>\n"
         "    <true/>\n"
-        "    <key>ProcessType</key>\n"
-        "    <string>Interactive</string>\n"
         "    <key>ThrottleInterval</key>\n"
         "    <integer>5</integer>\n"
         "    <key>StandardOutPath</key>\n"
         "    <string>/var/log/fanctl.log</string>\n"
         "    <key>StandardErrorPath</key>\n"
-        "    <string>/var/log/fanctl.log</string>\n"
+        "    <string>/var/log/fanctl.err</string>\n"
         "</dict>\n"
         "</plist>\n"
         "PLISTEOF\n"
@@ -218,9 +225,11 @@ bool daemon_cmd_uninstall(const std::vector<std::string>& /*args*/) {
         "#!/bin/bash\n"
         "launchctl bootout system/com.fanctl.daemon 2>/dev/null || "
         "launchctl unload /Library/LaunchDaemons/com.fanctl.daemon.plist 2>/dev/null || true\n"
-        "rm -f /tmp/fanctl.sock\n"
+        "killall fanctld 2>/dev/null || true\n"
+        "rm -f '" + std::string(DAEMON_SOCKET_PATH) + "'\n"
+        "rm -f '" + std::string(DAEMON_PID_PATH) + "'\n"
         "rm -f /Library/LaunchDaemons/com.fanctl.daemon.plist\n"
-        "rm -f /var/log/fanctl.log\n"
+        "rm -f /var/log/fanctl.log /var/log/fanctl.err\n"
         "echo 'Daemon uninstalled.'\n";
 
     return run_with_sudo(script);
