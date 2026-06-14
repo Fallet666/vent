@@ -195,11 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func loadMenuBarImage() -> NSImage? {
-        let image = Bundle.main.url(forResource: "MacFanMenuBarTemplate", withExtension: "png")
-            .flatMap(NSImage.init(contentsOf:))
-        image?.isTemplate = true
-        image?.size = NSSize(width: 18, height: 18)
-        return image
+        FanMenuBarIcon.make(size: 18)
     }
 }
 
