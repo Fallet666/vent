@@ -172,25 +172,6 @@ No analytics, no telemetry, no accounts, no external servers. The app only talks
 
 ---
 
-## Project Status 📍
-
-FanControl is young but daily-driver ready. Current priorities:
-
-- [x] Menu-bar GUI with three modes
-- [x] Privileged launchd daemon
-- [x] Auto Temp (target temperature mode)
-- [x] Separate fan control
-- [x] CI, tests, DMG releases
-- [ ] Developer ID signing & notarization
-- [ ] Better first-run onboarding
-- [ ] Temperature/fan history charts
-- [ ] Per-mode presets
-- [ ] Automatic update checks
-
-See [`docs/LAUNCH_PLAN.md`](docs/LAUNCH_PLAN.md) for the full roadmap.
-
----
-
 ## Contributing 🤝
 
 Issues, compatibility reports, UI feedback, and PRs are welcome.
