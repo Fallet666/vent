@@ -67,6 +67,8 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(temperatureText(daemon.averageTemperature))
                     .font(.system(size: 31, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: daemon.averageTemperature)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
@@ -375,6 +377,8 @@ struct AutoTempModeView: View {
                 Spacer()
                 Text(formattedTemperature(targetTemperature))
                     .font(.title3.monospacedDigit().weight(.semibold))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: targetTemperature)
             }
 
             if let config = daemon.config {
@@ -531,6 +535,8 @@ struct FanSliderShell: View {
                         Text("Current \(currentRPM) RPM")
                             .font(.caption2)
                             .foregroundColor(.secondary)
+                            .contentTransition(.numericText())
+                            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: currentRPM)
                     }
                 }
                 Spacer()
@@ -555,8 +561,12 @@ struct FanSliderShell: View {
 
                 HStack {
                     Text("\(minRPM)")
+                        .contentTransition(.numericText())
+                        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: minRPM)
                     Spacer()
                     Text("\(maxRPM)")
+                        .contentTransition(.numericText())
+                        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: maxRPM)
                 }
                 .font(.caption2)
                 .foregroundColor(.secondary)
