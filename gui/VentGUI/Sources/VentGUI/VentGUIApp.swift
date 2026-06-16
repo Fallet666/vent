@@ -258,7 +258,7 @@ final class VentDaemonManager: ObservableObject {
 
     private var refreshTask: Task<Void, Never>?
     private var smoothedAverageTemperature: Double?
-    private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/mac-manual-rpm/releases/latest")!
+    private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/vent/releases/latest")!
     private var latestRelease: GitHubRelease?
     private var updateDownloader: UpdateDownloader?
 
