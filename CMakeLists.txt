@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mac_fan_control VERSION 1.1.2 LANGUAGES CXX)
+project(mac_fan_control VERSION 1.1.3 LANGUAGES CXX)
 
 include(CTest)
 
