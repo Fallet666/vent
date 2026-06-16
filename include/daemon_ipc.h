@@ -6,7 +6,7 @@
 
 namespace mac_fan_control {
 
-constexpr const char* APP_VERSION = "1.1.6";
+constexpr const char* APP_VERSION = "1.1.7";
 constexpr const char* DAEMON_SOCKET_PATH = "/tmp/fanctl.sock";
 constexpr const char* DAEMON_PID_PATH = "/tmp/fanctld.pid";
 constexpr int WATCHDOG_TIMEOUT_SECONDS = 10;

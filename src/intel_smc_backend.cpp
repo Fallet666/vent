@@ -12,8 +12,10 @@
 #include <chrono>
 #include <cctype>
 #include <IOKit/IOTypes.h>
+#include <IOKit/hidsystem/IOHIDEventSystemClient.h>
 #include <mach/mach_port.h>
 #include <sys/sysctl.h>
+#include <set>
 
 namespace mac_fan_control {
 
@@ -51,6 +53,104 @@ std::vector<TemperatureInfo> read_powermetrics_temperatures() {
     }
 
     pclose(pipe);
+    return temperatures;
+}
+
+// Private HID event system API (not in public headers on macOS)
+#ifdef __LP64__
+typedef double IOHIDFloat;
+#else
+typedef float IOHIDFloat;
+#endif
+
+extern "C" {
+typedef struct __IOHIDEvent *IOHIDEventRef;
+typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
+
+extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
+extern int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef match);
+extern CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
+extern IOHIDEventRef IOHIDServiceClientCopyEvent(IOHIDServiceClientRef service, int64_t type, int32_t options, int64_t timestamp);
+extern CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef property);
+extern IOHIDFloat IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
+} // extern "C"
+
+static constexpr int64_t kIOHIDEventTypeTemperature = 15;
+static constexpr int32_t kIOHIDEventFieldBase(int32_t type) { return type << 16; }
+static constexpr uint32_t kHIDPage_AppleVendor = 0xFF00;
+static constexpr uint32_t kHIDUsage_AppleVendor_TemperatureSensor = 5;
+
+std::vector<TemperatureInfo> read_hid_temperatures() {
+    std::vector<TemperatureInfo> temperatures;
+
+    CFNumberRef page_number = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &kHIDPage_AppleVendor);
+    CFNumberRef usage_number = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &kHIDUsage_AppleVendor_TemperatureSensor);
+
+    const void *keys[] = { CFSTR("PrimaryUsagePage"), CFSTR("PrimaryUsage") };
+    const void *values[] = { page_number, usage_number };
+
+    CFDictionaryRef matching = CFDictionaryCreate(kCFAllocatorDefault,
+        keys, values, 2,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    CFRelease(page_number);
+    CFRelease(usage_number);
+
+    if (!matching) return temperatures;
+
+    IOHIDEventSystemClientRef client = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
+    if (!client) {
+        CFRelease(matching);
+        return temperatures;
+    }
+
+    IOHIDEventSystemClientSetMatching(client, matching);
+    CFRelease(matching);
+
+    CFArrayRef services = IOHIDEventSystemClientCopyServices(client);
+    if (!services) {
+        CFRelease(client);
+        return temperatures;
+    }
+
+    std::set<std::string> seen_names;
+
+    CFIndex count = CFArrayGetCount(services);
+    for (CFIndex i = 0; i < count; ++i) {
+        IOHIDServiceClientRef service = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
+
+        CFStringRef name_ref = (CFStringRef)IOHIDServiceClientCopyProperty(service, CFSTR("Product"));
+        if (!name_ref) continue;
+
+        char name_buffer[128];
+        if (!CFStringGetCString(name_ref, name_buffer, sizeof(name_buffer), kCFStringEncodingUTF8)) {
+            CFRelease(name_ref);
+            continue;
+        }
+        CFRelease(name_ref);
+
+        std::string name(name_buffer);
+
+        // Skip duplicates (same sensor appears multiple times)
+        if (!seen_names.insert(name).second) continue;
+
+        IOHIDEventRef event = IOHIDServiceClientCopyEvent(service, kIOHIDEventTypeTemperature, 0, 0);
+        if (!event) continue;
+
+        double temp_value = IOHIDEventGetFloatValue(event, kIOHIDEventFieldBase(kIOHIDEventTypeTemperature));
+        CFRelease(event);
+
+        float temp_float = static_cast<float>(temp_value);
+        if (temp_float < MIN_USABLE_TEMPERATURE_C || temp_float >= MAX_USABLE_TEMPERATURE_C) continue;
+
+        TemperatureInfo temperature;
+        temperature.key = name;
+        temperature.value = temp_float;
+        temperatures.push_back(temperature);
+    }
+
+    CFRelease(services);
+    CFRelease(client);
     return temperatures;
 }
 
@@ -534,7 +634,11 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     if (!temps.empty()) return temps;
 
     uint32_t total = read_key_count();
-    if (total == 0) return read_powermetrics_temperatures();
+    if (total == 0) {
+        auto hid_temps = read_hid_temperatures();
+        if (!hid_temps.empty()) return hid_temps;
+        return read_powermetrics_temperatures();
+    }
 
     for (uint32_t i = 0; i < total; ++i) {
         SMCKeyData input{};
@@ -565,6 +669,10 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     }
 
     if (!temps.empty()) return temps;
+    {
+        auto hid_temps = read_hid_temperatures();
+        if (!hid_temps.empty()) return hid_temps;
+    }
     return read_powermetrics_temperatures();
 }
 
