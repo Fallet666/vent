@@ -299,7 +299,7 @@ final class DaemonManager: ObservableObject {
         }
 
         let temperatures = DaemonClient.shared.temperatures() ?? []
-        let fallbackAverageTemperature = averageTemperature(from: temperatures)
+            let fallbackAverageTemperature = hottestTemperature(from: temperatures)
         if let modeStatus = DaemonClient.shared.modeStatus() {
             controlMode = modeStatus.mode
             targetTemperature = modeStatus.targetTemperature
@@ -632,7 +632,7 @@ final class DaemonManager: ObservableObject {
         return min(max(rpm, commonMinRPM), commonMaxRPM)
     }
 
-    private func averageTemperature(from temperatures: [DaemonTemperature]) -> Double? {
+    private func hottestTemperature(from temperatures: [DaemonTemperature]) -> Double? {
         let validTemperatures = temperatures
             .filter { temperature in
                 temperature.value.isFinite &&
@@ -643,7 +643,7 @@ final class DaemonManager: ObservableObject {
             }
             .map(\.value)
         guard !validTemperatures.isEmpty else { return nil }
-        return validTemperatures.reduce(0, +) / Double(validTemperatures.count)
+        return validTemperatures.max()!
     }
 
     private func smoothedTemperature(_ temperature: Double?) -> Double? {

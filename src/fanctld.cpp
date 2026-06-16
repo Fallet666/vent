@@ -52,19 +52,14 @@ static const char* control_mode_to_string(ControlMode mode) {
     return "AUTO";
 }
 
-static float average_temperature(const std::vector<TemperatureInfo>& temperatures) {
-    float sum = 0.0f;
-    int count = 0;
+static float hottest_temperature(const std::vector<TemperatureInfo>& temperatures) {
+    float maximum = 0.0f;
     for (const auto& temperature : temperatures) {
         if (is_temperature_usable(temperature.key, temperature.value)) {
-            sum += temperature.value;
-            ++count;
+            maximum = std::max(maximum, temperature.value);
         }
     }
-    if (count == 0) {
-        return 0.0f;
-    }
-    return sum / static_cast<float>(count);
+    return maximum;
 }
 
 static float common_min_speed(const std::vector<FanInfo>& fans) {
@@ -193,7 +188,7 @@ int main(int argc, char** argv) {
     uint64_t last_temperature_control = 0;
     ControlMode control_mode = ControlMode::Auto;
     float target_temperature = DEFAULT_TARGET_TEMPERATURE_C;
-    float last_average_temperature = 0.0f;
+    float last_hottest_temperature = 0.0f;
     float last_auto_temperature_rpm = 0.0f;
 
     auto now_ms = []() -> uint64_t {
@@ -362,7 +357,7 @@ int main(int argc, char** argv) {
                         } else if (cmd == "MODESTATUS") {
                             response = "MODE " + std::string(control_mode_to_string(control_mode)) + " " +
                                 std::to_string(target_temperature) + " " +
-                                std::to_string(last_average_temperature) + " " +
+                                std::to_string(last_hottest_temperature) + " " +
                                 std::to_string(last_auto_temperature_rpm);
                         } else if (cmd == "CONFIG") {
                             response = "CONFIG " + std::to_string(MIN_TARGET_TEMPERATURE_C) + " " +
@@ -434,13 +429,13 @@ int main(int argc, char** argv) {
             last_temperature_control = now;
             auto temperatures = backend->get_all_temperatures();
             auto fans = backend->get_all_fans();
-            last_average_temperature = average_temperature(temperatures);
-
-            if (last_average_temperature > 0.0f && !fans.empty()) {
+            last_hottest_temperature = hottest_temperature(temperatures);
+            
+            if (last_hottest_temperature > 0.0f && !fans.empty()) {
                 float min_speed = common_min_speed(fans);
                 float max_speed = common_max_speed(fans);
                 last_auto_temperature_rpm = rpm_for_temperature(
-                    last_average_temperature,
+                    last_hottest_temperature,
                     target_temperature,
                     min_speed,
                     max_speed
