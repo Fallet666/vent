@@ -16,15 +16,29 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 7) {
-            if !daemon.hasCompletedOnboarding && !daemon.daemonOnline {
-                OnboardingView()
-                    .environmentObject(daemon)
-                    .frame(width: 296)
-            } else if showsSettings {
-                settingsView
-            } else {
-                mainView
+            Group {
+                if !daemon.hasCompletedOnboarding && !daemon.daemonOnline {
+                    OnboardingView()
+                        .environmentObject(daemon)
+                        .frame(width: 296)
+                        .transition(.opacity)
+                } else if showsSettings {
+                    settingsView
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                } else {
+                    mainView
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
+                        ))
+                }
             }
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9), value: showsSettings)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9), value: daemon.hasCompletedOnboarding)
+            .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.9), value: daemon.daemonOnline)
 
             Divider()
             footerView
@@ -48,6 +62,10 @@ struct ContentView: View {
             temperatureView
             modePicker
             activeModeView
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
         } else {
             offlineView
         }
@@ -61,6 +79,8 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(temperatureText(daemon.averageTemperature))
                     .font(.system(size: 31, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: daemon.averageTemperature)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
@@ -69,6 +89,8 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(rpmSummaryText)
                     .font(.title3.monospacedDigit().weight(.semibold))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: rpmSummaryValue)
             }
         }
         .padding(.horizontal, 8)
@@ -94,19 +116,25 @@ struct ContentView: View {
         )
     }
 
-    @ViewBuilder
     private var activeModeView: some View {
-        switch daemon.controlMode {
-        case .auto:
-            AutoModeView()
-                .environmentObject(daemon)
-        case .manualRPM:
-            ManualRPMModeView()
-                .environmentObject(daemon)
-        case .autoTemp:
-            AutoTempModeView(temperatureUnit: temperatureUnit)
-                .environmentObject(daemon)
+        Group {
+            switch daemon.controlMode {
+            case .auto:
+                AutoModeView()
+                    .environmentObject(daemon)
+            case .manualRPM:
+                ManualRPMModeView()
+                    .environmentObject(daemon)
+            case .autoTemp:
+                AutoTempModeView(temperatureUnit: temperatureUnit)
+                    .environmentObject(daemon)
+            }
         }
+        .transition(.asymmetric(
+            insertion: .move(edge: .bottom).combined(with: .opacity),
+            removal: .move(edge: .top).combined(with: .opacity)
+        ))
+        .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.85), value: daemon.controlMode)
     }
 
     private var offlineView: some View {
@@ -114,6 +142,7 @@ struct ContentView: View {
             Image(systemName: "fanblades.slash")
                 .font(.system(size: 30))
                 .foregroundColor(.secondary)
+                .symbolVariant(.slash)
             Text("Vent needs setup")
                 .font(.headline)
             Text("Open settings to install or update the helper.")
@@ -121,11 +150,14 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             Button("Open Settings") {
-                showsSettings = true
+                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.9)) {
+                    showsSettings = true
+                }
             }
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
+        .transition(.scale.combined(with: .opacity))
     }
 
     private var settingsView: some View {
@@ -270,7 +302,9 @@ struct ContentView: View {
     private var footerView: some View {
         HStack(spacing: 8) {
             Button {
-                showsSettings.toggle()
+                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.9)) {
+                    showsSettings.toggle()
+                }
             } label: {
                 Image(systemName: showsSettings ? "xmark" : "gearshape")
                     .font(.system(size: 12, weight: .semibold))
@@ -526,6 +560,8 @@ struct FanSliderShell: View {
                 Spacer()
                 Text("\(rpm) RPM")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: rpm)
             }
 
             if maxRPM > minRPM {

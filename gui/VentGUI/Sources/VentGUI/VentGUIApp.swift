@@ -95,14 +95,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let panelSize = adaptivePanelSize(for: panel, screen: screen)
         panel.setContentSize(panelSize)
         panel.setFrameOrigin(panelOrigin(for: button, panelSize: panelSize, screen: screen))
-        panel.displayIfNeeded()
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        panel.displayIfNeeded()
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        panel.animator().alphaValue = 1
+        if let contentView = panel.contentView {
+            contentView.layer?.transform = CATransform3DMakeScale(0.96, 0.96, 1)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                contentView.animator().layer?.transform = CATransform3DIdentity
+            }
+        }
     }
 
     private func closePanel() {
-        panel?.orderOut(nil)
+        guard let panel else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        } completionHandler: {
+            panel.orderOut(nil)
+        }
     }
 
     private func installOutsideClickMonitors() {
