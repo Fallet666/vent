@@ -101,7 +101,7 @@ struct ContentView: View {
     }
 
     private var activeModeView: some View {
-        ZStack(alignment: .top) {
+        Group {
             switch daemon.controlMode {
             case .auto:
                 AutoModeView()
@@ -114,7 +114,6 @@ struct ContentView: View {
                     .environmentObject(daemon)
             }
         }
-        .frame(minHeight: 140)
     }
 
     private var offlineView: some View {
