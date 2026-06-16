@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installOutsideClickMonitors()
 
         DaemonManager.shared.refresh()
+        DaemonManager.shared.checkForUpdatesIfEnabled()
     }
 
     deinit {
@@ -204,9 +205,20 @@ final class FanControlPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
+private struct GitHubRelease: Decodable {
+    let tagName: String
+    let htmlURL: URL
+
+    enum CodingKeys: String, CodingKey {
+        case tagName = "tag_name"
+        case htmlURL = "html_url"
+    }
+}
+
 @MainActor
 final class DaemonManager: ObservableObject {
     static let shared = DaemonManager()
+    static let updateChecksEnabledKey = "checkForUpdatesAutomatically"
 
     @Published var fans: [FanState] = []
     @Published var daemonOnline = false
@@ -221,11 +233,17 @@ final class DaemonManager: ObservableObject {
     @Published var isUninstalling = false
     @Published var helperVersion: String?
     @Published var bundledVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
+    @Published var latestReleaseVersion: String?
+    @Published var latestReleaseURL: URL?
+    @Published var updateCheckMessage: String?
+    @Published var isCheckingForUpdates = false
 
     private var refreshTask: Task<Void, Never>?
     private var smoothedAverageTemperature: Double?
+    private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/mac-manual-rpm/releases/latest")!
 
     private init() {
+        UserDefaults.standard.register(defaults: [Self.updateChecksEnabledKey: true])
         startRefreshLoop()
     }
 
@@ -278,6 +296,60 @@ final class DaemonManager: ObservableObject {
         return normalizedReleaseVersion(helperVersion) != normalizedReleaseVersion(bundledVersion)
     }
 
+    var appUpdateAvailable: Bool {
+        guard let latestReleaseVersion else { return false }
+        return compareReleaseVersions(latestReleaseVersion, bundledVersion) == .orderedDescending
+    }
+
+    func checkForUpdatesIfEnabled() {
+        guard UserDefaults.standard.bool(forKey: Self.updateChecksEnabledKey) else { return }
+        checkForUpdates(manual: false)
+    }
+
+    func checkForUpdates(manual: Bool) {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
+        if manual {
+            updateCheckMessage = "Checking for updates..."
+        }
+
+        Task.detached { [latestReleaseAPIURL] in
+            do {
+                var request = URLRequest(url: latestReleaseAPIURL)
+                request.timeoutInterval = 6
+                request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+                request.setValue("FanControl", forHTTPHeaderField: "User-Agent")
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200..<300).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+                await MainActor.run {
+                    self.latestReleaseVersion = release.tagName
+                    self.latestReleaseURL = release.htmlURL
+                    self.updateCheckMessage = self.appUpdateAvailable ?
+                        "Version \(release.tagName) is available" : "FanControl is up to date"
+                    self.isCheckingForUpdates = false
+                }
+            } catch {
+                await MainActor.run {
+                    if manual {
+                        self.updateCheckMessage = "Could not check for updates"
+                    }
+                    self.isCheckingForUpdates = false
+                }
+            }
+        }
+    }
+
+    func openLatestRelease() {
+        guard let latestReleaseURL else { return }
+        NSWorkspace.shared.open(latestReleaseURL)
+    }
+
     private func normalizedReleaseVersion(_ version: String) -> String {
         let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
         let versionWithoutPrefix = trimmedVersion.hasPrefix("v") ? String(trimmedVersion.dropFirst()) : trimmedVersion
@@ -285,6 +357,32 @@ final class DaemonManager: ObservableObject {
             return versionWithoutPrefix
         }
         return String(releaseVersion)
+    }
+
+    private func compareReleaseVersions(_ leftVersion: String, _ rightVersion: String) -> ComparisonResult {
+        let leftComponents = releaseVersionComponents(leftVersion)
+        let rightComponents = releaseVersionComponents(rightVersion)
+        let componentCount = max(leftComponents.count, rightComponents.count)
+
+        for componentIndex in 0..<componentCount {
+            let leftComponent = componentIndex < leftComponents.count ? leftComponents[componentIndex] : 0
+            let rightComponent = componentIndex < rightComponents.count ? rightComponents[componentIndex] : 0
+            if leftComponent > rightComponent {
+                return .orderedDescending
+            }
+            if leftComponent < rightComponent {
+                return .orderedAscending
+            }
+        }
+        return .orderedSame
+    }
+
+    private func releaseVersionComponents(_ version: String) -> [Int] {
+        normalizedReleaseVersion(version)
+            .split(separator: ".")
+            .map { versionPart in
+                Int(versionPart.prefix { $0.isNumber }) ?? 0
+            }
     }
 
     func setControlMode(_ mode: FanControlMode) {

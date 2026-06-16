@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var daemon: DaemonManager
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
+    @AppStorage(DaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
     @State private var showsSettings = false
 
     private var temperatureUnit: TemperatureUnit {
@@ -158,11 +159,20 @@ struct ContentView: View {
             }
             .settingsCard()
 
+            updatesSettingsView
+
             Button("Quit FanControl") {
                 daemon.quit()
             }
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
+        }
+        .onChange(of: updateChecksAutomatically) { newValue in
+            if newValue {
+                daemon.checkForUpdates(manual: false)
+            } else {
+                daemon.updateCheckMessage = nil
+            }
         }
     }
 
@@ -177,6 +187,35 @@ struct ContentView: View {
         }
         .font(.caption)
         .foregroundColor(.secondary)
+    }
+
+    private var updatesSettingsView: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Updates")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Toggle("Check for updates automatically", isOn: $updateChecksAutomatically)
+                .toggleStyle(.checkbox)
+            if let updateCheckMessage = daemon.updateCheckMessage {
+                Text(updateCheckMessage)
+                    .font(.caption)
+                    .foregroundColor(daemon.appUpdateAvailable ? .orange : .secondary)
+            }
+            HStack(spacing: 8) {
+                Button(daemon.isCheckingForUpdates ? "Checking..." : "Check Now") {
+                    daemon.checkForUpdates(manual: true)
+                }
+                .disabled(daemon.isCheckingForUpdates)
+
+                if daemon.appUpdateAvailable {
+                    Button("Download Update") {
+                        daemon.openLatestRelease()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+        .settingsCard()
     }
 
     private var footerView: some View {
