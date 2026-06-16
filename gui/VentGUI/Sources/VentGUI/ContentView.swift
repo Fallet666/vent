@@ -75,6 +75,8 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(rpmSummaryText)
                     .font(.title3.monospacedDigit().weight(.semibold))
+                    .contentTransition(.numericText())
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: rpmSummaryText)
             }
         }
         .padding(.horizontal, 8)
