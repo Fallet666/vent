@@ -310,6 +310,7 @@ struct AutoTempModeView: View {
     let temperatureUnit: TemperatureUnit
 
     @State private var targetTemperature = 0.0
+    @State private var isEditingTemperature = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -332,6 +333,7 @@ struct AutoTempModeView: View {
                     in: config.minTargetTemperature...config.maxTargetTemperature,
                     step: 1
                 ) { editing in
+                    isEditingTemperature = editing
                     if !editing {
                         daemon.setTargetTemperature(targetTemperature)
                     }
@@ -353,6 +355,7 @@ struct AutoTempModeView: View {
         .modeCard()
         .onAppear { targetTemperature = daemon.targetTemperature }
         .onChange(of: daemon.targetTemperature) { newValue in
+            guard !isEditingTemperature else { return }
             targetTemperature = newValue
         }
     }
@@ -408,6 +411,7 @@ struct ManualRPMModeView: View {
 struct CommonFanSliderView: View {
     @EnvironmentObject var daemon: DaemonManager
     @State private var sliderValue: Double = 0
+    @State private var isEditingFanSlider = false
 
     var body: some View {
         FanSliderShell(
@@ -418,10 +422,12 @@ struct CommonFanSliderView: View {
             maxRPM: daemon.commonMaxRPM,
             isDisabled: !daemon.hasValidCommonRange,
             sliderValue: $sliderValue,
+            isEditing: $isEditingFanSlider,
             onRpmChange: { daemon.setAllFans(rpm: $0) }
         )
         .onAppear { sliderValue = Double(daemon.commonRPM) }
         .onChange(of: daemon.commonRPM) { newValue in
+            guard !isEditingFanSlider else { return }
             sliderValue = Double(newValue)
         }
     }
@@ -432,6 +438,7 @@ struct FanSliderView: View {
     let onRpmChange: (Int) -> Void
 
     @State private var sliderValue: Double = 0
+    @State private var isEditingFanSlider = false
 
     var body: some View {
         FanSliderShell(
@@ -442,10 +449,12 @@ struct FanSliderView: View {
             maxRPM: fan.maxRPM,
             isDisabled: !fan.hasValidRange,
             sliderValue: $sliderValue,
+            isEditing: $isEditingFanSlider,
             onRpmChange: onRpmChange
         )
         .onAppear { sliderValue = Double(fan.rpm) }
         .onChange(of: fan.rpm) { newValue in
+            guard !isEditingFanSlider else { return }
             sliderValue = Double(newValue)
         }
     }
@@ -459,6 +468,7 @@ struct FanSliderShell: View {
     let maxRPM: Int
     let isDisabled: Bool
     @Binding var sliderValue: Double
+    @Binding var isEditing: Bool
     let onRpmChange: (Int) -> Void
 
     var body: some View {
@@ -486,6 +496,7 @@ struct FanSliderShell: View {
                 ) {
                     Text(title)
                 } onEditingChanged: { editing in
+                    isEditing = editing
                     if !editing {
                         onRpmChange(Int(sliderValue))
                     }

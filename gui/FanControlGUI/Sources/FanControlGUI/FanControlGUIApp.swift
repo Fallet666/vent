@@ -233,6 +233,7 @@ private struct GitHubRelease: Decodable {
 final class DaemonManager: ObservableObject {
     static let shared = DaemonManager()
     static let updateChecksEnabledKey = "checkForUpdatesAutomatically"
+    static let lastUpdateCheckDateKey = "lastUpdateCheckDate"
 
     @Published var fans: [FanState] = []
     @Published var daemonOnline = false
@@ -329,6 +330,14 @@ final class DaemonManager: ObservableObject {
         checkForUpdates(manual: false)
     }
 
+    private static let updateCheckInterval: TimeInterval = 24 * 60 * 60
+
+    private func shouldPerformScheduledCheck() -> Bool {
+        guard UserDefaults.standard.bool(forKey: Self.updateChecksEnabledKey) else { return false }
+        let lastCheckDate = UserDefaults.standard.object(forKey: Self.lastUpdateCheckDateKey) as? Date ?? .distantPast
+        return Date().timeIntervalSince(lastCheckDate) >= Self.updateCheckInterval
+    }
+
     func checkForUpdates(manual: Bool) {
         guard !isCheckingForUpdates else { return }
         isCheckingForUpdates = true
@@ -351,6 +360,7 @@ final class DaemonManager: ObservableObject {
 
                 let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
                 await MainActor.run {
+                    UserDefaults.standard.set(Date(), forKey: Self.lastUpdateCheckDateKey)
                     self.latestRelease = release
                     self.latestReleaseVersion = release.tagName
                     self.latestReleaseURL = release.htmlURL
