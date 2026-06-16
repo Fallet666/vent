@@ -117,23 +117,31 @@ struct ContentView: View {
     }
 
     private var activeModeView: some View {
-        Group {
+        ZStack {
             switch daemon.controlMode {
             case .auto:
                 AutoModeView()
                     .environmentObject(daemon)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
             case .manualRPM:
                 ManualRPMModeView()
                     .environmentObject(daemon)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
             case .autoTemp:
                 AutoTempModeView(temperatureUnit: temperatureUnit)
                     .environmentObject(daemon)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
             }
         }
-        .transition(.asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .move(edge: .top).combined(with: .opacity)
-        ))
         .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.85), value: daemon.controlMode)
     }
 
