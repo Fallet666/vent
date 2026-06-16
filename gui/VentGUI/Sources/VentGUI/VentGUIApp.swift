@@ -691,7 +691,7 @@ final class VentDaemonManager: ObservableObject {
             smoothedAverageTemperature = temperature
             return temperature
         }
-        let smoothedTemperature = previousTemperature * 0.75 + temperature * 0.25
+        let smoothedTemperature = previousTemperature * 0.85 + temperature * 0.15
         smoothedAverageTemperature = smoothedTemperature
         return smoothedTemperature
     }

@@ -21,24 +21,12 @@ struct ContentView: View {
                     OnboardingView()
                         .environmentObject(daemon)
                         .frame(width: 296)
-                        .transition(.opacity)
                 } else if showsSettings {
                     settingsView
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
                 } else {
                     mainView
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
                 }
             }
-            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9), value: showsSettings)
-            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9), value: daemon.hasCompletedOnboarding)
-            .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.9), value: daemon.daemonOnline)
 
             Divider()
             footerView
@@ -79,8 +67,6 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(temperatureText(daemon.averageTemperature))
                     .font(.system(size: 31, weight: .semibold, design: .rounded))
-                    .contentTransition(.numericText())
-                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: daemon.averageTemperature)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
@@ -89,8 +75,6 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text(rpmSummaryText)
                     .font(.title3.monospacedDigit().weight(.semibold))
-                    .contentTransition(.numericText())
-                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: rpmSummaryValue)
             }
         }
         .padding(.horizontal, 8)
@@ -117,32 +101,20 @@ struct ContentView: View {
     }
 
     private var activeModeView: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             switch daemon.controlMode {
             case .auto:
                 AutoModeView()
                     .environmentObject(daemon)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
             case .manualRPM:
                 ManualRPMModeView()
                     .environmentObject(daemon)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
             case .autoTemp:
                 AutoTempModeView(temperatureUnit: temperatureUnit)
                     .environmentObject(daemon)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
             }
         }
-        .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.85), value: daemon.controlMode)
+        .frame(minHeight: 140)
     }
 
     private var offlineView: some View {
@@ -158,14 +130,11 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             Button("Open Settings") {
-                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.9)) {
-                    showsSettings = true
-                }
+                showsSettings = true
             }
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
-        .transition(.scale.combined(with: .opacity))
     }
 
     private var settingsView: some View {
@@ -310,9 +279,7 @@ struct ContentView: View {
     private var footerView: some View {
         HStack(spacing: 8) {
             Button {
-                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.9)) {
-                    showsSettings.toggle()
-                }
+                showsSettings.toggle()
             } label: {
                 Image(systemName: showsSettings ? "xmark" : "gearshape")
                     .font(.system(size: 12, weight: .semibold))

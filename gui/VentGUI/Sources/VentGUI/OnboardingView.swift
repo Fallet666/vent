@@ -61,7 +61,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 if currentStep < steps.count - 1 {
                     Button("Next") {
-                        withAnimation { currentStep += 1 }
+                        currentStep += 1
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
