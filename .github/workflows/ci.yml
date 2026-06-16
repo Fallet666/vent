@@ -23,5 +23,5 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       - name: Build Swift GUI
-        working-directory: gui/FanControlGUI
+        working-directory: gui/VentGUI
         run: swift build -c release

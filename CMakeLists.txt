@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mac_fan_control VERSION 1.1.6 LANGUAGES CXX)
+project(vent VERSION 1.1.6 LANGUAGES CXX)
 
 include(CTest)
 
@@ -20,7 +20,7 @@ find_library(COREFOUNDATION CoreFoundation)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Library target
-add_library(fan_control STATIC
+add_library(vent STATIC
     src/smc_backend.cpp
     src/intel_smc_backend.cpp
     src/fan_controller.cpp
@@ -28,32 +28,32 @@ add_library(fan_control STATIC
     src/daemon_ipc.cpp
 )
 
-target_link_libraries(fan_control PUBLIC ${IOKIT} ${COREFOUNDATION})
+target_link_libraries(vent PUBLIC ${IOKIT} ${COREFOUNDATION})
 
 # CLI executable
-add_executable(fanctl
+add_executable(ventctl
     src/main.cpp
     src/daemon_client.cpp
 )
-target_link_libraries(fanctl PRIVATE fan_control)
+target_link_libraries(ventctl PRIVATE vent)
 
 # Daemon executable
-add_executable(fanctld
-    src/fanctld.cpp
+add_executable(ventd
+    src/ventd.cpp
     src/daemon_ipc.cpp
 )
-target_link_libraries(fanctld PRIVATE fan_control)
+target_link_libraries(ventd PRIVATE vent)
 
 if(BUILD_TESTING)
     add_executable(unit_tests
         tests/unit_tests.cpp
     )
-    target_link_libraries(unit_tests PRIVATE fan_control)
+    target_link_libraries(unit_tests PRIVATE vent)
     add_test(NAME unit_tests COMMAND unit_tests)
 endif()
 
 # Install targets
-install(TARGETS fan_control fanctl fanctld
+install(TARGETS vent ventctl ventd
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

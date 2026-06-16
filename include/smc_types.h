@@ -6,7 +6,7 @@
 #include <vector>
 #include <optional>
 
-namespace mac_fan_control {
+namespace vent {
 
 enum class SMCDataType : uint32_t {
     // Values are FOUR_CHARACTER_CODE big-endian: (c0<<24)|(c1<<16)|(c2<<8)|c3
@@ -326,4 +326,4 @@ inline void float_to_bytes(float value, uint8_t* bytes, SMCDataType type, uint32
     }
 }
 
-} // namespace mac_fan_control
+} // namespace vent

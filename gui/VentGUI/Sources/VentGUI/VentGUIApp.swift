@@ -4,11 +4,11 @@ import SwiftUI
 @MainActor
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private static let resizePanelNotification = Notification.Name("FanControlResizePanel")
+    private static let resizePanelNotification = Notification.Name("VentResizePanel")
     private static var sharedDelegate: AppDelegate?
 
     private var statusItem: NSStatusItem?
-    private var panel: FanControlPanel?
+    private var panel: VentPanel?
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
     private let panelWidth: CGFloat = 320
@@ -42,8 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         installOutsideClickMonitors()
 
-        DaemonManager.shared.refresh()
-        DaemonManager.shared.checkForUpdatesIfEnabled()
+        VentDaemonManager.shared.refresh()
+        VentDaemonManager.shared.checkForUpdatesIfEnabled()
     }
 
     deinit {
@@ -77,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button,
               let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
-        DaemonManager.shared.refresh()
+        VentDaemonManager.shared.refresh()
 
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -139,16 +139,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: resizePanelNotification, object: nil)
     }
 
-    private func makePanel() -> FanControlPanel {
+    private func makePanel() -> VentPanel {
         let content = ContentView()
-            .environmentObject(DaemonManager.shared)
+            .environmentObject(VentDaemonManager.shared)
             .environment(\.controlActiveState, .key)
             .frame(width: panelWidth)
         let hostingView = NSHostingView(rootView: content)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        let panel = FanControlPanel(
+        let panel = VentPanel(
             contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 360),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
@@ -192,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        DaemonManager.shared.quit()
+        VentDaemonManager.shared.quit()
     }
 
     private func loadMenuBarImage() -> NSImage? {
@@ -200,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-final class FanControlPanel: NSPanel {
+final class VentPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 }
@@ -230,8 +230,8 @@ private struct GitHubRelease: Decodable {
 }
 
 @MainActor
-final class DaemonManager: ObservableObject {
-    static let shared = DaemonManager()
+final class VentDaemonManager: ObservableObject {
+    static let shared = VentDaemonManager()
     static let updateChecksEnabledKey = "checkForUpdatesAutomatically"
     static let lastUpdateCheckDateKey = "lastUpdateCheckDate"
 
@@ -239,11 +239,11 @@ final class DaemonManager: ObservableObject {
     @Published var daemonOnline = false
     @Published var statusMessage = "Connecting..."
     @Published var averageTemperature: Double?
-    @Published var controlMode: FanControlMode = .auto
+    @Published var controlMode: VentMode = .auto
     @Published var targetTemperature: Double = 0
     @Published var autoTemperatureRPM: Int?
     @Published var separateFans = false
-    @Published var config: DaemonConfig?
+    @Published var config: VentDaemonConfig?
     @Published var isInstalling = false
     @Published var isUninstalling = false
     @Published var helperVersion: String?
@@ -268,7 +268,7 @@ final class DaemonManager: ObservableObject {
     }
 
     func refresh() {
-        daemonOnline = DaemonClient.shared.isRunning()
+        daemonOnline = VentDaemonClient.shared.isRunning()
         guard daemonOnline else {
             fans = []
             averageTemperature = nil
@@ -277,9 +277,9 @@ final class DaemonManager: ObservableObject {
             return
         }
 
-        helperVersion = DaemonClient.shared.version()
-        let daemonFans = DaemonClient.shared.fans() ?? []
-        if let daemonConfig = DaemonClient.shared.config() {
+        helperVersion = VentDaemonClient.shared.version()
+        let daemonFans = VentDaemonClient.shared.fans() ?? []
+        if let daemonConfig = VentDaemonClient.shared.config() {
             config = daemonConfig
             if targetTemperature <= 0 {
                 targetTemperature = daemonConfig.defaultTargetTemperature
@@ -298,9 +298,9 @@ final class DaemonManager: ObservableObject {
             )
         }
 
-        let temperatures = DaemonClient.shared.temperatures() ?? []
+        let temperatures = VentDaemonClient.shared.temperatures() ?? []
             let fallbackAverageTemperature = hottestTemperature(from: temperatures)
-        if let modeStatus = DaemonClient.shared.modeStatus() {
+        if let modeStatus = VentDaemonClient.shared.modeStatus() {
             controlMode = modeStatus.mode
             targetTemperature = modeStatus.targetTemperature
             averageTemperature = smoothedTemperature(modeStatus.averageTemperature ?? fallbackAverageTemperature)
@@ -350,7 +350,7 @@ final class DaemonManager: ObservableObject {
                 var request = URLRequest(url: latestReleaseAPIURL)
                 request.timeoutInterval = 6
                 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-                request.setValue("FanControl", forHTTPHeaderField: "User-Agent")
+                request.setValue("Vent", forHTTPHeaderField: "User-Agent")
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
@@ -365,7 +365,7 @@ final class DaemonManager: ObservableObject {
                     self.latestReleaseVersion = release.tagName
                     self.latestReleaseURL = release.htmlURL
                     self.updateCheckMessage = self.appUpdateAvailable ?
-                        "Version \(release.tagName) is available" : "FanControl is up to date"
+                        "Version \(release.tagName) is available" : "Vent is up to date"
                     self.isCheckingForUpdates = false
                 }
             } catch {
@@ -428,7 +428,7 @@ final class DaemonManager: ObservableObject {
         sleep 2
         /usr/bin/hdiutil attach "\(dmgURL.path)" -mountpoint "\(mountPoint)" -nobrowse -quiet
         /bin/rm -rf "\(appPath)"
-        /bin/cp -R "\(mountPoint)/FanControl.app" "\(appPath)"
+        /bin/cp -R "\(mountPoint)/Vent.app" "\(appPath)"
         /usr/bin/hdiutil detach "\(mountPoint)" -quiet -force
         /bin/rm -f "\(dmgURL.path)" "\(scriptPath)"
         /usr/bin/open "\(appPath)"
@@ -487,10 +487,10 @@ final class DaemonManager: ObservableObject {
             }
     }
 
-    func setControlMode(_ mode: FanControlMode) {
+    func setControlMode(_ mode: VentMode) {
         guard daemonOnline else { return }
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
-        let ok = DaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
+        let ok = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
         if ok {
             controlMode = mode
             statusMessage = "Mode: \(mode.title)"
@@ -507,7 +507,7 @@ final class DaemonManager: ObservableObject {
             targetTemperature = temperature
         }
         guard daemonOnline, controlMode == .autoTemp else { return }
-        statusMessage = DaemonClient.shared.setMode(.autoTemp, targetTemperature: targetTemperature) ?
+        statusMessage = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: targetTemperature) ?
             "Target temperature updated" : "Failed to set target temperature"
     }
 
@@ -518,13 +518,13 @@ final class DaemonManager: ObservableObject {
             for fanIndex in fans.indices {
                 fans[fanIndex].rpm = clampedRPM
             }
-            statusMessage = DaemonClient.shared.setAllFans(rpm: clampedRPM) ?
+            statusMessage = VentDaemonClient.shared.setAllFans(rpm: clampedRPM) ?
                 "All fans set to \(clampedRPM) RPM" : "Failed to set all fans"
         } else {
             if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
                 fans[fanIndex].rpm = clampedRPM
             }
-            statusMessage = DaemonClient.shared.setFan(index: index, rpm: clampedRPM) ?
+            statusMessage = VentDaemonClient.shared.setFan(index: index, rpm: clampedRPM) ?
                 "Fan #\(index) set to \(clampedRPM) RPM" : "Failed to set fan #\(index)"
         }
     }
@@ -535,13 +535,13 @@ final class DaemonManager: ObservableObject {
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
         }
-        statusMessage = DaemonClient.shared.setAllFans(rpm: clampedRPM) ?
+        statusMessage = VentDaemonClient.shared.setAllFans(rpm: clampedRPM) ?
             "All fans set to \(clampedRPM) RPM" : "Failed to set all fans"
     }
 
     func setAutoAll() {
         guard daemonOnline else { return }
-        statusMessage = DaemonClient.shared.setMode(.auto) ?
+        statusMessage = VentDaemonClient.shared.setMode(.auto) ?
             "macOS controls fans automatically" : "Failed to return fans to auto mode"
         refresh()
     }
@@ -552,7 +552,7 @@ final class DaemonManager: ObservableObject {
         statusMessage = "Requesting admin permission..."
 
         Task.detached {
-            let result = FanControlInstaller.installOrUpdateDaemon()
+            let result = VentInstaller.installOrUpdateDaemon()
             await MainActor.run {
                 self.isInstalling = false
                 self.statusMessage = result.message
@@ -567,7 +567,7 @@ final class DaemonManager: ObservableObject {
         statusMessage = "Requesting admin permission..."
 
         Task.detached {
-            let result = FanControlInstaller.uninstallDaemon()
+            let result = VentInstaller.uninstallDaemon()
             await MainActor.run {
                 self.isUninstalling = false
                 self.statusMessage = result.message
@@ -580,7 +580,7 @@ final class DaemonManager: ObservableObject {
         guard !isInstalling, !isUninstalling else { return }
         let alert = NSAlert()
         alert.messageText = "Uninstall privileged helper?"
-        alert.informativeText = "FanControl will switch fans back to Auto, stop the daemon, and remove installed helper binaries. The app itself will stay installed."
+        alert.informativeText = "Vent will switch fans back to Auto, stop the daemon, and remove installed helper binaries. The app itself will stay installed."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Uninstall")
         alert.addButton(withTitle: "Cancel")
@@ -632,7 +632,7 @@ final class DaemonManager: ObservableObject {
         return min(max(rpm, commonMinRPM), commonMaxRPM)
     }
 
-    private func hottestTemperature(from temperatures: [DaemonTemperature]) -> Double? {
+    private func hottestTemperature(from temperatures: [VentDaemonTemperature]) -> Double? {
         let validTemperatures = temperatures
             .filter { temperature in
                 temperature.value.isFinite &&
@@ -699,35 +699,35 @@ struct InstallResult {
     let message: String
 }
 
-enum FanControlInstaller {
+enum VentInstaller {
     static func installOrUpdateDaemon() -> InstallResult {
-        guard let fanctldPath = bundledOrDevelopmentBinary(named: "fanctld"),
-              let fanctlPath = bundledOrDevelopmentBinary(named: "fanctl") else {
+        guard let ventdPath = bundledOrDevelopmentBinary(named: "ventd"),
+              let ventctlPath = bundledOrDevelopmentBinary(named: "ventctl") else {
             return InstallResult(success: false, message: "Bundled daemon binaries not found")
         }
 
         let script = """
         set -e
         mkdir -p /usr/local/bin
-        cp -f \(shellQuoted(fanctldPath)) /usr/local/bin/fanctld
-        cp -f \(shellQuoted(fanctlPath)) /usr/local/bin/fanctl
-        chmod 755 /usr/local/bin/fanctld /usr/local/bin/fanctl
-        chown root:wheel /usr/local/bin/fanctld /usr/local/bin/fanctl 2>/dev/null || true
-        launchctl bootout system/com.fanctl.daemon 2>/dev/null || true
-        killall fanctld 2>/dev/null || true
-        rm -f /tmp/fanctl.sock /tmp/fanctld.pid
-        touch /var/log/fanctl.log /var/log/fanctl.err
-        chmod 644 /var/log/fanctl.log /var/log/fanctl.err
-        cat > /Library/LaunchDaemons/com.fanctl.daemon.plist << 'PLISTEOF'
+        cp -f \(shellQuoted(ventdPath)) /usr/local/bin/ventd
+        cp -f \(shellQuoted(ventctlPath)) /usr/local/bin/ventctl
+        chmod 755 /usr/local/bin/ventd /usr/local/bin/ventctl
+        chown root:wheel /usr/local/bin/ventd /usr/local/bin/ventctl 2>/dev/null || true
+        launchctl bootout system/com.vent.daemon 2>/dev/null || true
+        killall ventd 2>/dev/null || true
+        rm -f /tmp/ventd.sock /tmp/ventd.pid
+        touch /var/log/ventd.log /var/log/ventd.err
+        chmod 644 /var/log/ventd.log /var/log/ventd.err
+        cat > /Library/LaunchDaemons/com.vent.daemon.plist << 'PLISTEOF'
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>com.fanctl.daemon</string>
+            <string>com.vent.daemon</string>
             <key>ProgramArguments</key>
             <array>
-                <string>/usr/local/bin/fanctld</string>
+                <string>/usr/local/bin/ventd</string>
             </array>
             <key>RunAtLoad</key>
             <true/>
@@ -736,14 +736,14 @@ enum FanControlInstaller {
             <key>ThrottleInterval</key>
             <integer>5</integer>
             <key>StandardOutPath</key>
-            <string>/var/log/fanctl.log</string>
+            <string>/var/log/ventd.log</string>
             <key>StandardErrorPath</key>
-            <string>/var/log/fanctl.err</string>
+            <string>/var/log/ventd.err</string>
         </dict>
         </plist>
         PLISTEOF
-        chmod 644 /Library/LaunchDaemons/com.fanctl.daemon.plist
-        launchctl bootstrap system /Library/LaunchDaemons/com.fanctl.daemon.plist 2>/dev/null || launchctl load /Library/LaunchDaemons/com.fanctl.daemon.plist
+        chmod 644 /Library/LaunchDaemons/com.vent.daemon.plist
+        launchctl bootstrap system /Library/LaunchDaemons/com.vent.daemon.plist 2>/dev/null || launchctl load /Library/LaunchDaemons/com.vent.daemon.plist
         """
 
         return runPrivilegedScript(script, successMessage: "Helper installed/updated")
@@ -752,15 +752,15 @@ enum FanControlInstaller {
     static func uninstallDaemon() -> InstallResult {
         let script = """
         set -e
-        if [ -S /tmp/fanctl.sock ]; then
-            printf 'MODE AUTO\\n' | nc -U /tmp/fanctl.sock >/dev/null 2>&1 || true
-            printf 'SHUTDOWN\\n' | nc -U /tmp/fanctl.sock >/dev/null 2>&1 || true
+        if [ -S /tmp/ventd.sock ]; then
+            printf 'MODE AUTO\\n' | nc -U /tmp/ventd.sock >/dev/null 2>&1 || true
+            printf 'SHUTDOWN\\n' | nc -U /tmp/ventd.sock >/dev/null 2>&1 || true
         fi
-        launchctl bootout system/com.fanctl.daemon 2>/dev/null || true
-        killall fanctld 2>/dev/null || true
-        rm -f /Library/LaunchDaemons/com.fanctl.daemon.plist
-        rm -f /usr/local/bin/fanctld /usr/local/bin/fanctl
-        rm -f /tmp/fanctl.sock /tmp/fanctld.pid
+        launchctl bootout system/com.vent.daemon 2>/dev/null || true
+        killall ventd 2>/dev/null || true
+        rm -f /Library/LaunchDaemons/com.vent.daemon.plist
+        rm -f /usr/local/bin/ventd /usr/local/bin/ventctl
+        rm -f /tmp/ventd.sock /tmp/ventd.pid
         """
 
         return runPrivilegedScript(script, successMessage: "Helper uninstalled")

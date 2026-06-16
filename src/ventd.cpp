@@ -1,6 +1,6 @@
 #include "smc_backend.h"
 #include "daemon_ipc.h"
-#include "fan_control_config.h"
+#include "vent_config.h"
 #include <iostream>
 #include <cstring>
 #include <cstdio>
@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <poll.h>
 
-using namespace mac_fan_control;
+using namespace vent;
 
 static std::atomic<bool> g_running{true};
 
@@ -112,8 +112,8 @@ static bool write_raw_key(SMCBackend& backend, const std::string& key, float val
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            std::cerr << "fanctld - macOS Fan Control Daemon\n";
-            std::cerr << "Usage: fanctld [options]\n";
+            std::cerr << "ventd - macOS Vent Daemon\n";
+            std::cerr << "Usage: ventd [options]\n";
             std::cerr << "  -f, --foreground    Accepted for compatibility; daemon always stays in foreground\n";
             std::cerr << "  -h, --help          Show this help\n";
             return 0;

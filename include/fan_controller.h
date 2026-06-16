@@ -7,7 +7,7 @@
 #include <string>
 #include <functional>
 
-namespace mac_fan_control {
+namespace vent {
 
 class FanController {
 public:
@@ -53,4 +53,4 @@ private:
     bool monitoring_ = false;
 };
 
-} // namespace mac_fan_control
+} // namespace vent

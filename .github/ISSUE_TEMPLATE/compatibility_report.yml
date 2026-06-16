@@ -1,12 +1,12 @@
 name: Mac compatibility report
-description: Report how FanControl works on your Mac model
+description: Report how Vent works on your Mac model
 title: "Compatibility: <Mac model> on <macOS version>"
 labels: [compatibility]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve FanControl across more Mac models.
+        Thanks for helping improve Vent across more Mac models.
 
   - type: input
     id: mac-model
@@ -63,9 +63,9 @@ body:
       description: Paste output from the commands below if possible.
       value: |
         ```bash
-        fanctl list
-        fanctl temps
-        fanctl daemon status
+        ventctl list
+        ventctl temps
+        ventctl daemon status
         ```
       render: shell
 

@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <chrono>
 
-namespace mac_fan_control {
+namespace vent {
 
 // SMCKeyData struct matching Apple's SMC kernel driver exactly.
 // These sub-struct types match the IOKit AppleSMC header definitions.
@@ -130,7 +130,7 @@ private:
     void apply_keyed_revert(uint32_t index);
 };
 
-} // namespace mac_fan_control
+} // namespace vent
 
-static_assert(sizeof(mac_fan_control::SMCKeyData) == 80,
+static_assert(sizeof(vent::SMCKeyData) == 80,
               "SMCKeyData must be exactly 80 bytes to match kernel driver");

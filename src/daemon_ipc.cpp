@@ -1,6 +1,6 @@
 #include "daemon_ipc.h"
 
-namespace mac_fan_control {
+namespace vent {
 
 std::vector<std::string> split_command(const std::string& s) {
     std::vector<std::string> parts;
@@ -19,4 +19,4 @@ std::vector<std::string> split_command(const std::string& s) {
     return parts;
 }
 
-} // namespace mac_fan_control
+} // namespace vent

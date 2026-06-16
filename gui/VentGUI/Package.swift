@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "FanControlGUI",
+    name: "VentGUI",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "FanControlGUI",
+            name: "VentGUI",
             dependencies: [],
             resources: [.process("Resources")])
     ]

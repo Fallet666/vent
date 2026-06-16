@@ -1,14 +1,14 @@
-<h1 align="center">FanControl for macOS</h1>
+<h1 align="center">Vent for macOS</h1>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/mac-manual-rpm/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Fallet666/mac-manual-rpm?style=flat-square&logo=github&label=Release" alt="Release">
+  <a href="https://github.com/Fallet666/vent/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&logo=github&label=Release" alt="Release">
   </a>
-  <a href="https://github.com/Fallet666/mac-manual-rpm/releases">
-    <img src="https://img.shields.io/github/downloads/Fallet666/mac-manual-rpm/total?style=flat-square&logo=github&label=Downloads" alt="Downloads">
+  <a href="https://github.com/Fallet666/vent/releases">
+    <img src="https://img.shields.io/github/downloads/Fallet666/vent/total?style=flat-square&logo=github&label=Downloads" alt="Downloads">
   </a>
-  <a href="https://github.com/Fallet666/mac-manual-rpm/actions/workflows/ci.yml">
-    <img src="https://github.com/Fallet666/mac-manual-rpm/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI">
+  <a href="https://github.com/Fallet666/vent/actions/workflows/ci.yml">
+    <img src="https://github.com/Fallet666/vent/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="MIT License">
@@ -16,7 +16,7 @@
   <br>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple" alt="macOS 14+">
   <a href="https://github.com/Fallet666/homebrew-tap">
-    <img src="https://img.shields.io/badge/Homebrew-FanControl-f5492b?style=flat-square&logo=homebrew" alt="Homebrew">
+    <img src="https://img.shields.io/badge/Homebrew-Vent-f5492b?style=flat-square&logo=homebrew" alt="Homebrew">
   </a>
   <img src="https://img.shields.io/badge/Swift-5.7-red?style=flat-square&logo=swift" alt="Swift 5.7">
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C?style=flat-square&logo=cplusplus" alt="C++17">
@@ -29,8 +29,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/mac-manual-rpm/releases/latest">
-    <img src="https://img.shields.io/badge/⬇%20Download%20Latest%20DMG-FanControl-blue?style=for-the-badge" alt="Download">
+  <a href="https://github.com/Fallet666/vent/releases/latest">
+    <img src="https://img.shields.io/badge/⬇%20Download%20Latest%20DMG-Vent-blue?style=for-the-badge" alt="Download">
   </a>
 </p>
 
@@ -100,24 +100,24 @@ Built for modern macOS (Apple Silicon and Intel). Uses a privileged launchd help
 
 ```bash
 brew tap Fallet666/homebrew-tap
-brew install --cask fan-control
+brew install --cask vent
 ```
 
-Then launch FanControl and follow the app's on-screen instructions to install the privileged helper.
+Then launch Vent and follow the app's on-screen instructions to install the privileged helper.
 
 ### Manual (DMG)
 
-1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Fallet666/mac-manual-rpm/releases/latest).
-2. Open the DMG and drag `FanControl.app` to `Applications`.
-3. Launch FanControl and click **Install / Update** in the menu-bar popover.
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Fallet666/vent/releases/latest).
+2. Open the DMG and drag `Vent.app` to `Applications`.
+3. Launch Vent and click **Install / Update** in the menu-bar popover.
 
 macOS will ask for an administrator password — this installs a privileged helper daemon into `/Library/LaunchDaemons` and CLI tools into `/usr/local/bin`.
 
 To remove everything later, click **Uninstall** in the Settings panel.
 
-> The app is ad-hoc signed. If macOS blocks it, right-click `FanControl.app` and choose **Open**, or run:
+> The app is ad-hoc signed. If macOS blocks it, right-click `Vent.app` and choose **Open**, or run:
 > ```bash
-> xattr -dr com.apple.quarantine /Applications/FanControl.app
+> xattr -dr com.apple.quarantine /Applications/Vent.app
 > ```
 
 ---
@@ -139,7 +139,7 @@ Pick a target temperature instead of a raw RPM. The daemon watches sensors and a
 
 ## Safety 🛡️
 
-- FanControl does **not** disable macOS thermal protection.
+- Vent does **not** disable macOS thermal protection.
 - **Auto** mode is always one click away.
 - The daemon has a watchdog for manual RPM control.
 - If anything looks wrong, switch to **Auto** or quit the app.
@@ -148,15 +148,15 @@ Pick a target temperature instead of a raw RPM. The daemon watches sensors and a
 
 ## CLI 🧑‍💻
 
-Advanced users can use `fanctl` after installing the helper:
+Advanced users can use `ventctl` after installing the helper:
 
 ```bash
-fanctl list          # list fans
-fanctl temps         # show temperatures
-fanctl daemon status # check daemon state
-fanctl persist-all 2500  # set and persist RPM
-fanctl unpersist-all     # return to macOS control
-fanctl read F0Ac    # read raw SMC key
+ventctl list          # list fans
+ventctl temps         # show temperatures
+ventctl daemon status # check daemon state
+ventctl persist-all 2500  # set and persist RPM
+ventctl unpersist-all     # return to macOS control
+ventctl read F0Ac    # read raw SMC key
 ```
 
 ---
@@ -170,19 +170,19 @@ cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 
-cd gui/FanControlGUI
+cd gui/VentGUI
 swift build -c release
 
 # Package DMG
 ./package_dmg.sh
-open dist/FanControl-*.dmg
+open dist/Vent-*.dmg
 ```
 
 ---
 
 ## Privacy 🔒
 
-No analytics, no telemetry, no accounts, no external servers. The app only talks to its local helper daemon over a Unix socket at `/tmp/fanctl.sock`.
+No analytics, no telemetry, no accounts, no external servers. The app only talks to its local helper daemon over a Unix socket at `/tmp/ventd.sock`.
 
 ---
 
@@ -190,7 +190,7 @@ No analytics, no telemetry, no accounts, no external servers. The app only talks
 
 Issues, compatibility reports, UI feedback, and PRs are welcome.
 
-When testing a new Mac model, please use the [compatibility report template](.github/ISSUE_TEMPLATE/compatibility_report.yml) and include `fanctl list`, `fanctl temps`, and `fanctl daemon status`.
+When testing a new Mac model, please use the [compatibility report template](.github/ISSUE_TEMPLATE/compatibility_report.yml) and include `ventctl list`, `ventctl temps`, and `ventctl daemon status`.
 
 ---
 

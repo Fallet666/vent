@@ -1,5 +1,5 @@
 #include "daemon_ipc.h"
-#include "fan_control_config.h"
+#include "vent_config.h"
 #include "smc_types.h"
 
 #include <cmath>
@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-using namespace mac_fan_control;
+using namespace vent;
 
 namespace {
 
@@ -40,8 +40,8 @@ void TestSplitCommand() {
 void TestDaemonConstants() {
     Expect(std::string(APP_VERSION).find('.') != std::string::npos,
            "APP_VERSION should be a visible release version");
-    Expect(std::string(DAEMON_SOCKET_PATH) == "/tmp/fanctl.sock", "daemon socket path should stay stable");
-    Expect(std::string(DAEMON_PID_PATH) == "/tmp/fanctld.pid", "daemon pid path should stay stable");
+    Expect(std::string(DAEMON_SOCKET_PATH) == "/tmp/ventd.sock", "daemon socket path should stay stable");
+    Expect(std::string(DAEMON_PID_PATH) == "/tmp/ventd.pid", "daemon pid path should stay stable");
 }
 
 void TestTemperatureConfig() {

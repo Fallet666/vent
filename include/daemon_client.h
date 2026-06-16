@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace mac_fan_control {
+namespace vent {
 
 // Check if daemon is running
 bool daemon_is_running();
@@ -27,4 +27,4 @@ bool daemon_cmd_uninstall(const std::vector<std::string>& args);
 bool daemon_cmd_status(const std::vector<std::string>& args);
 bool daemon_cmd_shutdown(const std::vector<std::string>& args);
 
-} // namespace mac_fan_control
+} // namespace vent

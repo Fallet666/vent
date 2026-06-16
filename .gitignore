@@ -3,7 +3,7 @@ build/
 *.a
 *.dSYM/
 .DS_Store
-gui/FanControlGUI/.build/
+gui/VentGUI/.build/
 dist/
 vibe/
 
@@ -13,4 +13,4 @@ CMakeFiles/
 Makefile
 cmake_install.cmake
 install_manifest.txt
-fanctl
+ventctl

@@ -6,7 +6,7 @@
 #include <string>
 #include <optional>
 
-namespace mac_fan_control {
+namespace vent {
 
 class SMCBackend {
 public:
@@ -40,4 +40,4 @@ public:
 
 std::unique_ptr<SMCBackend> create_smc_backend();
 
-} // namespace mac_fan_control
+} // namespace vent

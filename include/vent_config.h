@@ -3,7 +3,7 @@
 #include <array>
 #include <string>
 
-namespace mac_fan_control {
+namespace vent {
 
 constexpr float MIN_USABLE_TEMPERATURE_C = 20.0f;
 constexpr float MAX_USABLE_TEMPERATURE_C = 130.0f;
@@ -28,4 +28,4 @@ inline constexpr std::array<const char*, 16> KNOWN_TEMPERATURE_KEYS = {
     "TG0D", "TG1D", "TG0H", "Tm0P", "TB0T", "Th0H", "Ts0P", "Ts0S"
 };
 
-} // namespace mac_fan_control
+} // namespace vent

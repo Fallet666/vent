@@ -1,10 +1,10 @@
 #include "fan_controller.h"
-#include "fan_control_config.h"
+#include "vent_config.h"
 #include <thread>
 #include <chrono>
 #include <algorithm>
 
-namespace mac_fan_control {
+namespace vent {
 
 FanController::FanController(std::unique_ptr<SMCBackend> backend)
     : backend_(std::move(backend)) {}
@@ -161,4 +161,4 @@ void FanController::stop_monitoring() {
     monitoring_ = false;
 }
 
-} // namespace mac_fan_control
+} // namespace vent

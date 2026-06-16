@@ -8,7 +8,7 @@
 #include <thread>
 #include <chrono>
 
-using namespace mac_fan_control;
+using namespace vent;
 
 static volatile sig_atomic_t g_keep_running = 1;
 
@@ -73,7 +73,7 @@ static void cmd_temps(FanController& ctrl) {
 
 static void cmd_set(FanController& ctrl, int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: fanctl set <fan_index> <speed_rpm>\n";
+        std::cerr << "Usage: ventctl set <fan_index> <speed_rpm>\n";
         return;
     }
 
@@ -89,7 +89,7 @@ static void cmd_set(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_set_percent(FanController& ctrl, int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: fanctl set-percent <fan_index> <percent>\n";
+        std::cerr << "Usage: ventctl set-percent <fan_index> <percent>\n";
         return;
     }
 
@@ -105,7 +105,7 @@ static void cmd_set_percent(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_auto(FanController& ctrl, int argc, char** argv) {
     if (argc < 1) {
-        std::cerr << "Usage: fanctl auto <fan_index>\n";
+        std::cerr << "Usage: ventctl auto <fan_index>\n";
         return;
     }
 
@@ -120,7 +120,7 @@ static void cmd_auto(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_persist(FanController& ctrl, int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: fanctl persist <fan_index> <speed_rpm>\n";
+        std::cerr << "Usage: ventctl persist <fan_index> <speed_rpm>\n";
         return;
     }
 
@@ -140,7 +140,7 @@ static void cmd_persist(FanController& ctrl, int argc, char** argv) {
                 }
             }
             std::cout << "\nDisconnected. Daemon watchdog will revert fan #" << index << " to auto after 10s.\n";
-            std::cout << "Use 'fanctl unpersist " << index << "' to revert immediately.\n";
+            std::cout << "Use 'ventctl unpersist " << index << "' to revert immediately.\n";
             return;
         }
         std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
@@ -163,7 +163,7 @@ static void cmd_persist(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_persist_percent(FanController& ctrl, int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: fanctl persist-percent <fan_index> <percent>\n";
+        std::cerr << "Usage: ventctl persist-percent <fan_index> <percent>\n";
         return;
     }
 
@@ -182,7 +182,7 @@ static void cmd_persist_percent(FanController& ctrl, int argc, char** argv) {
                 }
             }
             std::cout << "\nDisconnected. Daemon watchdog will revert fan #" << index << " to auto after 10s.\n";
-            std::cout << "Use 'fanctl unpersist " << index << "' to revert immediately.\n";
+            std::cout << "Use 'ventctl unpersist " << index << "' to revert immediately.\n";
             return;
         }
         std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
@@ -213,7 +213,7 @@ static void cmd_persist_percent(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_unpersist(FanController& ctrl, int argc, char** argv) {
     if (argc < 1) {
-        std::cerr << "Usage: fanctl unpersist <fan_index>\n";
+        std::cerr << "Usage: ventctl unpersist <fan_index>\n";
         return;
     }
 
@@ -237,7 +237,7 @@ static void cmd_unpersist(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_persist_all(FanController& ctrl, int argc, char** argv) {
     if (argc < 1) {
-        std::cerr << "Usage: fanctl persist-all <speed_rpm>\n";
+        std::cerr << "Usage: ventctl persist-all <speed_rpm>\n";
         return;
     }
 
@@ -258,7 +258,7 @@ static void cmd_persist_all(FanController& ctrl, int argc, char** argv) {
                 }
             }
             std::cout << "\nDisconnected. Daemon watchdog will revert all fans to auto after 10s.\n";
-            std::cout << "Use 'fanctl unpersist-all' to revert immediately.\n";
+            std::cout << "Use 'ventctl unpersist-all' to revert immediately.\n";
             return;
         }
         std::cerr << "Daemon command failed. Falling back to direct SMC...\n";
@@ -317,7 +317,7 @@ static void cmd_info(FanController& ctrl) {
 
 static void cmd_read(FanController& ctrl, int argc, char** argv) {
     if (argc < 1) {
-        std::cerr << "Usage: fanctl read <key>\n";
+        std::cerr << "Usage: ventctl read <key>\n";
         return;
     }
 
@@ -359,7 +359,7 @@ static void cmd_read(FanController& ctrl, int argc, char** argv) {
 
 static void cmd_write(FanController& ctrl, int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: fanctl write <key> <value>\n";
+        std::cerr << "Usage: ventctl write <key> <value>\n";
         return;
     }
 
@@ -377,7 +377,7 @@ static void cmd_write(FanController& ctrl, int argc, char** argv) {
     if (ctrl.write_key(key, value)) {
         std::cout << "Key '" << key << "' set to " << value << "\n";
     } else {
-        std::cerr << "Failed to write key '" << key << "'. Try running as root or install/start fanctld.\n";
+        std::cerr << "Failed to write key '" << key << "'. Try running as root or install/start ventd.\n";
     }
 }
 
@@ -391,7 +391,7 @@ static void cmd_list_keys(FanController& ctrl) {
 
 static void print_usage() {
     std::cerr << "macOS Fan Control Utility v" << APP_VERSION << "\n";
-    std::cerr << "Usage: fanctl <command> [args...]\n\n";
+    std::cerr << "Usage: ventctl <command> [args...]\n\n";
     std::cerr << "Commands:\n";
     std::cerr << "  list                             List all fans with speed info\n";
     std::cerr << "  temps                            List all temperature sensors\n";
@@ -441,7 +441,7 @@ int main(int argc, char** argv) {
             return daemon_cmd_shutdown(daemon_args) ? 0 : 1;
         } else {
             std::cerr << "Unknown daemon command: " << sub << "\n";
-            std::cerr << "Usage: fanctl daemon <install|uninstall|status|shutdown>\n";
+            std::cerr << "Usage: ventctl daemon <install|uninstall|status|shutdown>\n";
             return 1;
         }
     }

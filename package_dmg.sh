@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-RESOURCE_DIR="$PROJECT_DIR/gui/FanControlGUI/Sources/FanControlGUI/Resources"
+RESOURCE_DIR="$PROJECT_DIR/gui/VentGUI/Sources/VentGUI/Resources"
 DEFAULT_VERSION="$(PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
 from pathlib import Path
 import os
@@ -18,9 +18,9 @@ PY
 )"
 VERSION="${VERSION:-$DEFAULT_VERSION}"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_DIR="$DIST_DIR/FanControl.app"
+APP_DIR="$DIST_DIR/Vent.app"
 DMG_STAGING_DIR="$DIST_DIR/dmg"
-DMG_PATH="$DIST_DIR/FanControl-$VERSION.dmg"
+DMG_PATH="$DIST_DIR/Vent-$VERSION.dmg"
 
 echo "=== Building C++ binaries ==="
 cmake -S "$PROJECT_DIR" -B "$PROJECT_DIR/build" -DBUILD_TESTING=ON
@@ -32,7 +32,7 @@ ctest --test-dir "$PROJECT_DIR/build" --output-on-failure
 
 echo ""
 echo "=== Building GUI app ==="
-cd "$PROJECT_DIR/gui/FanControlGUI"
+cd "$PROJECT_DIR/gui/VentGUI"
 swift build -c release
 cd "$PROJECT_DIR"
 
@@ -48,13 +48,13 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>FanControlGUI</string>
+    <string>VentGUI</string>
     <key>CFBundleIdentifier</key>
     <string>dev.borninvoid.macfancontrol</string>
     <key>CFBundleName</key>
-    <string>FanControl</string>
+    <string>Vent</string>
     <key>CFBundleDisplayName</key>
-    <string>FanControl</string>
+    <string>Vent</string>
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
@@ -62,7 +62,7 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>
-    <string>MacFanControl.icns</string>
+    <string>VentApp.icns</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
@@ -71,30 +71,30 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-cp "$PROJECT_DIR/gui/FanControlGUI/.build/release/FanControlGUI" "$APP_DIR/Contents/MacOS/FanControlGUI"
-cp "$RESOURCE_DIR/MacFanControl.icns" "$APP_DIR/Contents/Resources/MacFanControl.icns"
-cp "$RESOURCE_DIR/MacFanMenuBarTemplate.png" "$APP_DIR/Contents/Resources/MacFanMenuBarTemplate.png"
-cp "$RESOURCE_DIR/MacFanMenuBarTemplate@2x.png" "$APP_DIR/Contents/Resources/MacFanMenuBarTemplate@2x.png"
-cp "$PROJECT_DIR/build/fanctld" "$APP_DIR/Contents/Resources/fanctld"
-cp "$PROJECT_DIR/build/fanctl" "$APP_DIR/Contents/Resources/fanctl"
-chmod +x "$APP_DIR/Contents/MacOS/FanControlGUI" "$APP_DIR/Contents/Resources/fanctld" "$APP_DIR/Contents/Resources/fanctl"
+cp "$PROJECT_DIR/gui/VentGUI/.build/release/VentGUI" "$APP_DIR/Contents/MacOS/VentGUI"
+cp "$RESOURCE_DIR/VentApp.icns" "$APP_DIR/Contents/Resources/VentApp.icns"
+cp "$RESOURCE_DIR/VentMenuBarTemplate.png" "$APP_DIR/Contents/Resources/VentMenuBarTemplate.png"
+cp "$RESOURCE_DIR/VentMenuBarTemplate@2x.png" "$APP_DIR/Contents/Resources/VentMenuBarTemplate@2x.png"
+cp "$PROJECT_DIR/build/ventd" "$APP_DIR/Contents/Resources/ventd"
+cp "$PROJECT_DIR/build/ventctl" "$APP_DIR/Contents/Resources/ventctl"
+chmod +x "$APP_DIR/Contents/MacOS/VentGUI" "$APP_DIR/Contents/Resources/ventd" "$APP_DIR/Contents/Resources/ventctl"
 
 echo ""
 echo "=== Signing app bundle ==="
-codesign --force --sign - "$APP_DIR/Contents/MacOS/FanControlGUI"
-codesign --force --sign - "$APP_DIR/Contents/Resources/fanctld"
-codesign --force --sign - "$APP_DIR/Contents/Resources/fanctl"
+codesign --force --sign - "$APP_DIR/Contents/MacOS/VentGUI"
+codesign --force --sign - "$APP_DIR/Contents/Resources/ventd"
+codesign --force --sign - "$APP_DIR/Contents/Resources/ventctl"
 codesign --force --sign - --deep "$APP_DIR"
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
 echo ""
 echo "=== Creating DMG ==="
 mkdir -p "$DMG_STAGING_DIR"
-cp -R "$APP_DIR" "$DMG_STAGING_DIR/FanControl.app"
+cp -R "$APP_DIR" "$DMG_STAGING_DIR/Vent.app"
 ln -s /Applications "$DMG_STAGING_DIR/Applications"
 
 hdiutil create \
-    -volname "FanControl" \
+    -volname "Vent" \
     -srcfolder "$DMG_STAGING_DIR" \
     -ov \
     -format UDZO \

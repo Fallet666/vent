@@ -1,6 +1,6 @@
 #include "intel_smc_backend.h"
 #include "daemon_ipc.h"
-#include "fan_control_config.h"
+#include "vent_config.h"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -17,7 +17,7 @@
 #include <sys/sysctl.h>
 #include <set>
 
-namespace mac_fan_control {
+namespace vent {
 
 namespace {
 
@@ -756,4 +756,4 @@ void IntelSMCBackend::stop_all_persistent_fan_control() {
     }
 }
 
-} // namespace mac_fan_control
+} // namespace vent

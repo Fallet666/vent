@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var daemon: DaemonManager
+    @EnvironmentObject var daemon: VentDaemonManager
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
-    @AppStorage(DaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
+    @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
     @State private var showsSettings = false
 
     private var temperatureUnit: TemperatureUnit {
@@ -73,7 +73,7 @@ struct ContentView: View {
             get: { daemon.controlMode },
             set: { daemon.setControlMode($0) }
         )) {
-            ForEach([FanControlMode.auto, .autoTemp, .manualRPM]) { mode in
+            ForEach([VentMode.auto, .autoTemp, .manualRPM]) { mode in
                 Text(mode.title).tag(mode)
             }
         }
@@ -100,7 +100,7 @@ struct ContentView: View {
             Image(systemName: "fanblades.slash")
                 .font(.system(size: 30))
                 .foregroundColor(.secondary)
-            Text("FanControl needs setup")
+            Text("Vent needs setup")
                 .font(.headline)
             Text("Open settings to install or update the helper.")
                 .font(.caption)
@@ -161,7 +161,7 @@ struct ContentView: View {
 
             updatesSettingsView
 
-            Button("Quit FanControl") {
+            Button("Quit Vent") {
                 daemon.quit()
             }
             .buttonStyle(.plain)
@@ -291,13 +291,13 @@ struct ContentView: View {
 }
 
 struct AutoModeView: View {
-    @EnvironmentObject var daemon: DaemonManager
+    @EnvironmentObject var daemon: VentDaemonManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("macOS is controlling fan speed", systemImage: "checkmark.circle.fill")
                 .foregroundColor(.green)
-            Text("FanControl is not overriding RPM in this mode.")
+            Text("Vent is not overriding RPM in this mode.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -306,7 +306,7 @@ struct AutoModeView: View {
 }
 
 struct AutoTempModeView: View {
-    @EnvironmentObject var daemon: DaemonManager
+    @EnvironmentObject var daemon: VentDaemonManager
     let temperatureUnit: TemperatureUnit
 
     @State private var targetTemperature = 0.0
@@ -366,7 +366,7 @@ struct AutoTempModeView: View {
 }
 
 struct ManualRPMModeView: View {
-    @EnvironmentObject var daemon: DaemonManager
+    @EnvironmentObject var daemon: VentDaemonManager
 
     var body: some View {
         VStack(spacing: 7) {
@@ -409,7 +409,7 @@ struct ManualRPMModeView: View {
 }
 
 struct CommonFanSliderView: View {
-    @EnvironmentObject var daemon: DaemonManager
+    @EnvironmentObject var daemon: VentDaemonManager
     @State private var sliderValue: Double = 0
     @State private var isEditingFanSlider = false
 

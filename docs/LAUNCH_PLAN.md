@@ -1,16 +1,16 @@
-# FanControl Launch Plan
+# Vent Launch Plan
 
-This document is a practical product and marketing plan for launching FanControl as a free, open-source macOS utility for an international audience.
+This document is a practical product and marketing plan for launching Vent as a free, open-source macOS utility for an international audience.
 
 ## Product Positioning
 
 ### One-Liner
 
-FanControl is a free menu-bar app for controlling MacBook fans with manual RPM, automatic temperature targeting, and a safe return to macOS automatic cooling.
+Vent is a free menu-bar app for controlling MacBook fans with manual RPM, automatic temperature targeting, and a safe return to macOS automatic cooling.
 
 ### Short Pitch
 
-MacBooks often prioritize silence over temperature. FanControl gives users a simple way to cool their machine earlier, keep temperatures more stable during heavy workloads, and switch back to native macOS fan control at any time.
+MacBooks often prioritize silence over temperature. Vent gives users a simple way to cool their machine earlier, keep temperatures more stable during heavy workloads, and switch back to native macOS fan control at any time.
 
 ### Target Users
 
@@ -114,7 +114,7 @@ Free, simple, local-only fan control for MacBooks.
 
 Hi r/macapps,
 
-I built **FanControl**, a free and open-source macOS menu-bar app for controlling MacBook fans.
+I built **Vent**, a free and open-source macOS menu-bar app for controlling MacBook fans.
 
 The goal is simple: make it easier to keep a MacBook cooler during sustained workloads without installing a heavy app, creating an account, or paying for a subscription.
 
