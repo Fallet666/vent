@@ -195,7 +195,6 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             Toggle("Check for updates automatically", isOn: $updateChecksAutomatically)
-                .toggleStyle(.checkbox)
             if let updateCheckMessage = daemon.updateCheckMessage {
                 Text(updateCheckMessage)
                     .font(.caption)
