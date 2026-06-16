@@ -44,6 +44,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         VentDaemonManager.shared.refresh()
         VentDaemonManager.shared.checkForUpdatesIfEnabled()
+
+        performPendingDaemonUpdateIfNeeded()
+    }
+
+    private func performPendingDaemonUpdateIfNeeded() {
+        guard UserDefaults.standard.bool(forKey: VentDaemonManager.pendingDaemonUpdateKey) else { return }
+        UserDefaults.standard.set(false, forKey: VentDaemonManager.pendingDaemonUpdateKey)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            VentDaemonManager.shared.installOrUpdateDaemon()
+        }
     }
 
     deinit {
@@ -234,6 +245,9 @@ final class VentDaemonManager: ObservableObject {
     static let shared = VentDaemonManager()
     static let updateChecksEnabledKey = "checkForUpdatesAutomatically"
     static let lastUpdateCheckDateKey = "lastUpdateCheckDate"
+    static let onboardingCompletedKey = "onboardingCompleted"
+
+    @AppStorage(onboardingCompletedKey) var hasCompletedOnboarding = false
 
     @Published var fans: [FanState] = []
     @Published var daemonOnline = false
@@ -384,10 +398,17 @@ final class VentDaemonManager: ObservableObject {
         NSWorkspace.shared.open(latestReleaseURL)
     }
 
+    static let pendingDaemonUpdateKey = "pendingDaemonUpdateAfterGUI"
+
     func downloadAndInstallUpdate() {
         guard let dmgURL = dmgDownloadURL else {
             updateCheckMessage = "Download URL not available"
             return
+        }
+
+        let shouldUpdateDaemon = UserDefaults.standard.bool(forKey: "updateDaemonWithGUI")
+        if shouldUpdateDaemon {
+            UserDefaults.standard.set(true, forKey: Self.pendingDaemonUpdateKey)
         }
 
         isDownloadingUpdate = true
@@ -409,6 +430,7 @@ final class VentDaemonManager: ObservableObject {
             case .failure(let downloadError):
                 self?.isDownloadingUpdate = false
                 self?.updateCheckMessage = "Download failed: \(downloadError.localizedDescription)"
+                UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
             }
         }
         downloader.startDownload(from: dmgURL)

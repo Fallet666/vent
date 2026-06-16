@@ -6,6 +6,7 @@ struct ContentView: View {
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
     @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
     @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
     @State private var launchAtLoginError: String?
     @State private var showsSettings = false
 
@@ -15,7 +16,11 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 7) {
-            if showsSettings {
+            if !daemon.hasCompletedOnboarding && !daemon.daemonOnline {
+                OnboardingView()
+                    .environmentObject(daemon)
+                    .frame(width: 296)
+            } else if showsSettings {
                 settingsView
             } else {
                 mainView
@@ -227,6 +232,9 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             Toggle("Check for updates automatically", isOn: $updateChecksAutomatically)
+            Toggle("Update helper with app", isOn: $updateDaemonWithGUI)
+                .font(.caption)
+                .help("When updating the app, also install the bundled helper daemon at the same time.")
             if let updateCheckMessage = daemon.updateCheckMessage {
                 Text(updateCheckMessage)
                     .font(.caption)
