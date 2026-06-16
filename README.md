@@ -15,6 +15,9 @@
   </a>
   <br>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple" alt="macOS 14+">
+  <a href="https://github.com/Fallet666/homebrew-tap">
+    <img src="https://img.shields.io/badge/Homebrew-FanControl-f5492b?style=flat-square&logo=homebrew" alt="Homebrew">
+  </a>
   <img src="https://img.shields.io/badge/Swift-5.7-red?style=flat-square&logo=swift" alt="Swift 5.7">
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C?style=flat-square&logo=cplusplus" alt="C++17">
   <img src="https://img.shields.io/badge/Apple%20Silicon-✓-brightgreen?style=flat-square&logo=apple" alt="Apple Silicon">
@@ -92,6 +95,17 @@ Built for modern macOS (Apple Silicon and Intel). Uses a privileged launchd help
 ---
 
 ## Install 🚀
+
+### Homebrew (recommended)
+
+```bash
+brew tap Fallet666/homebrew-tap
+brew install --cask fan-control
+```
+
+Then launch FanControl and follow the app's on-screen instructions to install the privileged helper.
+
+### Manual (DMG)
 
 1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Fallet666/mac-manual-rpm/releases/latest).
 2. Open the DMG and drag `FanControl.app` to `Applications`.
