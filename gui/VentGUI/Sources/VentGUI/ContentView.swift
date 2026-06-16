@@ -1,9 +1,12 @@
 import SwiftUI
+import ServiceManagement
 
 struct ContentView: View {
     @EnvironmentObject var daemon: VentDaemonManager
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
     @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
+    @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @State private var launchAtLoginError: String?
     @State private var showsSettings = false
 
     private var temperatureUnit: TemperatureUnit {
@@ -142,6 +145,29 @@ struct ContentView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
+            }
+            .settingsCard()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("Launch at Login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                            launchAtLoginError = nil
+                        } catch {
+                            launchAtLogin = !newValue
+                            launchAtLoginError = error.localizedDescription
+                        }
+                    }
+                if let launchAtLoginError {
+                    Text(launchAtLoginError)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
             }
             .settingsCard()
 
