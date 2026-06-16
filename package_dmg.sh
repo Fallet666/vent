@@ -3,7 +3,20 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESOURCE_DIR="$PROJECT_DIR/gui/FanControlGUI/Sources/FanControlGUI/Resources"
-VERSION="${VERSION:-$(git -C "$PROJECT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)}"
+DEFAULT_VERSION="$(PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
+from pathlib import Path
+import os
+import re
+
+header_path = Path(os.environ['PROJECT_DIR']) / 'include' / 'daemon_ipc.h'
+header_text = header_path.read_text()
+version_match = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', header_text)
+if not version_match:
+    raise SystemExit('APP_VERSION not found')
+print(version_match.group(1))
+PY
+)"
+VERSION="${VERSION:-$DEFAULT_VERSION}"
 DIST_DIR="$PROJECT_DIR/dist"
 APP_DIR="$DIST_DIR/FanControl.app"
 DMG_STAGING_DIR="$DIST_DIR/dmg"

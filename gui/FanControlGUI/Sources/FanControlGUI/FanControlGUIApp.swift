@@ -275,7 +275,16 @@ final class DaemonManager: ObservableObject {
 
     var helperNeedsUpdate: Bool {
         guard let helperVersion else { return !daemonOnline }
-        return helperVersion != bundledVersion
+        return normalizedReleaseVersion(helperVersion) != normalizedReleaseVersion(bundledVersion)
+    }
+
+    private func normalizedReleaseVersion(_ version: String) -> String {
+        let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        let versionWithoutPrefix = trimmedVersion.hasPrefix("v") ? String(trimmedVersion.dropFirst()) : trimmedVersion
+        guard let releaseVersion = versionWithoutPrefix.split(separator: "-").first else {
+            return versionWithoutPrefix
+        }
+        return String(releaseVersion)
     }
 
     func setControlMode(_ mode: FanControlMode) {
