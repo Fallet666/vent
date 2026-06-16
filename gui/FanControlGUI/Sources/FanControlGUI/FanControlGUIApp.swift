@@ -205,13 +205,27 @@ final class FanControlPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
+private struct GitHubAsset: Decodable {
+    let name: String
+    let browserDownloadURL: URL
+    let contentType: String
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case browserDownloadURL = "browser_download_url"
+        case contentType = "content_type"
+    }
+}
+
 private struct GitHubRelease: Decodable {
     let tagName: String
     let htmlURL: URL
+    let assets: [GitHubAsset]
 
     enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case htmlURL = "html_url"
+        case assets
     }
 }
 
@@ -237,10 +251,15 @@ final class DaemonManager: ObservableObject {
     @Published var latestReleaseURL: URL?
     @Published var updateCheckMessage: String?
     @Published var isCheckingForUpdates = false
+    @Published var isDownloadingUpdate = false
+    @Published var updateDownloadProgress: Double = 0
+    @Published var isInstallingUpdate = false
 
     private var refreshTask: Task<Void, Never>?
     private var smoothedAverageTemperature: Double?
     private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/mac-manual-rpm/releases/latest")!
+    private var latestRelease: GitHubRelease?
+    private var updateDownloader: UpdateDownloader?
 
     private init() {
         UserDefaults.standard.register(defaults: [Self.updateChecksEnabledKey: true])
@@ -301,6 +320,10 @@ final class DaemonManager: ObservableObject {
         return compareReleaseVersions(latestReleaseVersion, bundledVersion) == .orderedDescending
     }
 
+    var dmgDownloadURL: URL? {
+        latestRelease?.assets.first(where: { $0.contentType == "application/x-apple-diskimage" })?.browserDownloadURL
+    }
+
     func checkForUpdatesIfEnabled() {
         guard UserDefaults.standard.bool(forKey: Self.updateChecksEnabledKey) else { return }
         checkForUpdates(manual: false)
@@ -328,6 +351,7 @@ final class DaemonManager: ObservableObject {
 
                 let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
                 await MainActor.run {
+                    self.latestRelease = release
                     self.latestReleaseVersion = release.tagName
                     self.latestReleaseURL = release.htmlURL
                     self.updateCheckMessage = self.appUpdateAvailable ?
@@ -348,6 +372,74 @@ final class DaemonManager: ObservableObject {
     func openLatestRelease() {
         guard let latestReleaseURL else { return }
         NSWorkspace.shared.open(latestReleaseURL)
+    }
+
+    func downloadAndInstallUpdate() {
+        guard let dmgURL = dmgDownloadURL else {
+            updateCheckMessage = "Download URL not available"
+            return
+        }
+
+        isDownloadingUpdate = true
+        updateDownloadProgress = 0
+        updateCheckMessage = "Starting download..."
+        isCheckingForUpdates = false
+
+        let downloader = UpdateDownloader()
+        updateDownloader = downloader
+        downloader.onProgressUpdate = { [weak self] progress in
+            self?.updateDownloadProgress = progress
+            self?.updateCheckMessage = "Downloading... \(Int(progress * 100))%"
+        }
+        downloader.onDownloadComplete = { [weak self] downloadResult in
+            self?.updateDownloader = nil
+            switch downloadResult {
+            case .success(let fileURL):
+                self?.performInstall(from: fileURL)
+            case .failure(let downloadError):
+                self?.isDownloadingUpdate = false
+                self?.updateCheckMessage = "Download failed: \(downloadError.localizedDescription)"
+            }
+        }
+        downloader.startDownload(from: dmgURL)
+    }
+
+    private func performInstall(from dmgURL: URL) {
+        isDownloadingUpdate = false
+        isInstallingUpdate = true
+        updateCheckMessage = "Installing..."
+
+        let appPath = Bundle.main.bundlePath
+        let mountPoint = "/tmp/fancontrol_mount"
+        let scriptPath = "/tmp/fancontrol_update.sh"
+
+        let script = """
+        #!/bin/bash
+        sleep 2
+        /usr/bin/hdiutil attach "\(dmgURL.path)" -mountpoint "\(mountPoint)" -nobrowse -quiet
+        /bin/rm -rf "\(appPath)"
+        /bin/cp -R "\(mountPoint)/FanControl.app" "\(appPath)"
+        /usr/bin/hdiutil detach "\(mountPoint)" -quiet -force
+        /bin/rm -f "\(dmgURL.path)" "\(scriptPath)"
+        /usr/bin/open "\(appPath)"
+        """
+
+        do {
+            try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = [scriptPath]
+            try process.run()
+        } catch {
+            isInstallingUpdate = false
+            updateCheckMessage = "Install failed: \(error.localizedDescription)"
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApplication.shared.terminate(nil)
+        }
     }
 
     private func normalizedReleaseVersion(_ version: String) -> String {
@@ -553,6 +645,42 @@ final class DaemonManager: ObservableObject {
         let smoothedTemperature = previousTemperature * 0.75 + temperature * 0.25
         smoothedAverageTemperature = smoothedTemperature
         return smoothedTemperature
+    }
+}
+
+final class UpdateDownloader: NSObject, URLSessionDownloadDelegate {
+    var onProgressUpdate: ((Double) -> Void)?
+    var onDownloadComplete: ((Result<URL, Error>) -> Void)?
+    private var session: URLSession?
+
+    func startDownload(from downloadURL: URL) {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForResource = 120
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
+        let task = session?.downloadTask(with: downloadURL)
+        task?.resume()
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0
+        onProgressUpdate?(progress)
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        let stableURL = URL(fileURLWithPath: "/tmp/fancontrol_update.dmg")
+        try? FileManager.default.removeItem(at: stableURL)
+        do {
+            try FileManager.default.moveItem(at: location, to: stableURL)
+            onDownloadComplete?(.success(stableURL))
+        } catch {
+            onDownloadComplete?(.failure(error))
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let downloadError = error {
+            onDownloadComplete?(.failure(downloadError))
+        }
     }
 }
 

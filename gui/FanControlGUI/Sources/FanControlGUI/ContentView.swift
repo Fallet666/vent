@@ -207,10 +207,20 @@ struct ContentView: View {
                 .disabled(daemon.isCheckingForUpdates)
 
                 if daemon.appUpdateAvailable {
-                    Button("Download Update") {
-                        daemon.openLatestRelease()
+                    if daemon.isDownloadingUpdate {
+                        ProgressView(value: daemon.updateDownloadProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .frame(maxWidth: 100)
+                    } else if daemon.isInstallingUpdate {
+                        Text("Installing...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Button("Install Update") {
+                            daemon.downloadAndInstallUpdate()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
             }
         }
