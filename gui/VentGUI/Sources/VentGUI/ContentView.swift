@@ -78,6 +78,12 @@ struct ContentView: View {
             }
         }
         .pickerStyle(.segmented)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+                .padding(.horizontal, -6)
+                .padding(.vertical, -4)
+        )
     }
 
     @ViewBuilder
@@ -328,9 +334,9 @@ struct AutoTempModeView: View {
             }
 
             if let config = daemon.config {
-                Slider(
+                NativeSlider(
                     value: $targetTemperature,
-                    in: config.minTargetTemperature...config.maxTargetTemperature,
+                    range: config.minTargetTemperature...config.maxTargetTemperature,
                     step: 1
                 ) { editing in
                     isEditingTemperature = editing
@@ -489,19 +495,17 @@ struct FanSliderShell: View {
             }
 
             if maxRPM > minRPM {
-                Slider(
+                NativeSlider(
                     value: $sliderValue,
-                    in: Double(minRPM)...Double(maxRPM),
-                    step: 50
-                ) {
-                    Text(title)
-                } onEditingChanged: { editing in
+                    range: Double(minRPM)...Double(maxRPM),
+                    step: 50,
+                    isEnabled: !isDisabled
+                ) { editing in
                     isEditing = editing
                     if !editing {
                         onRpmChange(Int(sliderValue))
                     }
                 }
-                .disabled(isDisabled)
 
                 HStack {
                     Text("\(minRPM)")
