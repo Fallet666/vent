@@ -131,6 +131,12 @@ std::vector<TemperatureInfo> read_hid_temperatures() {
 
         std::string name(name_buffer);
 
+        // Replace spaces in sensor names with underscores to avoid breaking
+        // the space-delimited socket protocol between daemon and GUI.
+        for (char& ch : name) {
+            if (ch == ' ') ch = '_';
+        }
+
         // Skip duplicates (same sensor appears multiple times)
         if (!seen_names.insert(name).second) continue;
 
