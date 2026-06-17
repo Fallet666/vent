@@ -73,7 +73,6 @@ struct ContentView: View {
     private var mainView: some View {
         if daemon.daemonOnline {
             temperatureView
-            profilePicker
             modePicker
             activeModeView
                 .transition(.asymmetric(
@@ -83,28 +82,6 @@ struct ContentView: View {
         } else {
             offlineView
         }
-    }
-
-    private var profilePicker: some View {
-        HStack(spacing: 6) {
-            Picker("Profile", selection: Binding(
-                get: { daemon.selectedProfileID ?? daemon.profiles.first?.id ?? UUID() },
-                set: { newID in
-                    if let profile = daemon.profiles.first(where: { $0.id == newID }) {
-                        daemon.applyProfile(profile)
-                    }
-                }
-            )) {
-                ForEach(daemon.profiles) { profile in
-                    Text(profile.name).tag(profile.id)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(maxWidth: 160)
-            .help("Select a profile")
-        }
-        .padding(.horizontal, 8)
     }
 
     private var temperatureView: some View {

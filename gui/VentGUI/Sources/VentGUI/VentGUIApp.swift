@@ -893,24 +893,47 @@ extension VentDaemonManager {
     private static let profilesKey = "savedProfiles"
     private static let selectedProfileIDKey = "selectedProfileID"
 
-    var defaultProfile: VentProfile {
-        VentProfile(
-            id: UUID(),
-            name: "Default",
-            mode: .auto,
-            targetTemperature: config?.defaultTargetTemperature ?? 65,
-            separateFans: false,
-            fanRPMs: []
-        )
+    private static let quietProfile = VentProfile(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        name: "Quiet",
+        mode: .auto,
+        targetTemperature: 70,
+        separateFans: false,
+        fanRPMs: []
+    )
+
+    private static let normalProfile = VentProfile(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+        name: "Normal",
+        mode: .autoTemp,
+        targetTemperature: 65,
+        separateFans: false,
+        fanRPMs: []
+    )
+
+    private static let gamingProfile = VentProfile(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+        name: "Gaming",
+        mode: .autoTemp,
+        targetTemperature: 55,
+        separateFans: false,
+        fanRPMs: []
+    )
+
+    private static var stockProfiles: [VentProfile] {
+        [quietProfile, normalProfile, gamingProfile]
     }
 
     func loadProfiles() {
         guard let data = UserDefaults.standard.data(forKey: Self.profilesKey),
-              let loaded = try? JSONDecoder().decode([VentProfile].self, from: data) else {
-            profiles = [defaultProfile]
+              let loaded = try? JSONDecoder().decode([VentProfile].self, from: data), !loaded.isEmpty else {
+            profiles = Self.stockProfiles
+            UserDefaults.standard.set(try? JSONEncoder().encode(profiles), forKey: Self.profilesKey)
+            selectedProfileID = Self.normalProfile.id
+            UserDefaults.standard.set(selectedProfileID?.uuidString, forKey: Self.selectedProfileIDKey)
             return
         }
-        profiles = loaded.isEmpty ? [defaultProfile] : loaded
+        profiles = loaded
         if let savedID = UserDefaults.standard.string(forKey: Self.selectedProfileIDKey),
            let uuid = UUID(uuidString: savedID),
            profiles.contains(where: { $0.id == uuid }) {
@@ -973,7 +996,7 @@ extension VentDaemonManager {
     func deleteProfile(_ profile: VentProfile) {
         profiles.removeAll { $0.id == profile.id }
         if profiles.isEmpty {
-            profiles = [defaultProfile]
+            profiles = Array(Self.stockProfiles)
         }
         if selectedProfileID == profile.id {
             selectedProfileID = profiles.first?.id
