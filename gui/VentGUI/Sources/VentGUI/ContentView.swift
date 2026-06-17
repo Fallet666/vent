@@ -9,6 +9,11 @@ struct ContentView: View {
     @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
     @State private var launchAtLoginError: String?
     @State private var showsSettings = false
+    @State private var showsProfileNameInput = false
+    @State private var newProfileName = ""
+    @State private var profileForRename: VentProfile?
+    @State private var showsRenameInput = false
+    @State private var renameText = ""
 
     private var temperatureUnit: TemperatureUnit {
         TemperatureUnit(rawValue: temperatureUnitRaw) ?? .celsius
@@ -42,12 +47,33 @@ struct ContentView: View {
         )
         .compositingGroup()
         .onAppear { daemon.refresh() }
+        .alert("Save Profile", isPresented: $showsProfileNameInput) {
+            TextField("Profile name", text: $newProfileName)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                let trimmedName = newProfileName.trimmingCharacters(in: .whitespaces)
+                if !trimmedName.isEmpty {
+                    daemon.saveCurrentAsProfile(name: trimmedName)
+                }
+            }
+        }
+        .alert("Rename Profile", isPresented: $showsRenameInput) {
+            TextField("Profile name", text: $renameText)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                let trimmedName = renameText.trimmingCharacters(in: .whitespaces)
+                if !trimmedName.isEmpty, let profile = profileForRename {
+                    daemon.renameProfile(profile, newName: trimmedName)
+                }
+            }
+        }
     }
 
     @ViewBuilder
     private var mainView: some View {
         if daemon.daemonOnline {
             temperatureView
+            profilePicker
             modePicker
             activeModeView
                 .transition(.asymmetric(
@@ -57,6 +83,28 @@ struct ContentView: View {
         } else {
             offlineView
         }
+    }
+
+    private var profilePicker: some View {
+        HStack(spacing: 6) {
+            Picker("Profile", selection: Binding(
+                get: { daemon.selectedProfileID ?? daemon.profiles.first?.id ?? UUID() },
+                set: { newID in
+                    if let profile = daemon.profiles.first(where: { $0.id == newID }) {
+                        daemon.applyProfile(profile)
+                    }
+                }
+            )) {
+                ForEach(daemon.profiles) { profile in
+                    Text(profile.name).tag(profile.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 160)
+            .help("Select a profile")
+        }
+        .padding(.horizontal, 8)
     }
 
     private var temperatureView: some View {
@@ -204,6 +252,52 @@ struct ContentView: View {
                     }
                     .foregroundColor(.red)
                     .disabled(daemon.isInstalling || daemon.isUninstalling)
+                }
+            }
+            .settingsCard()
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Profiles")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                ForEach(daemon.profiles) { profile in
+                    HStack {
+                        Text(profile.name)
+                            .font(.caption)
+                        Spacer()
+                        if daemon.selectedProfileID == profile.id {
+                            Image(systemName: "checkmark")
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                        }
+                        Button("Rename") {
+                            profileForRename = profile
+                            renameText = profile.name
+                            showsRenameInput = true
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        if daemon.profiles.count > 1 {
+                            Button("Delete") {
+                                withAnimation {
+                                    daemon.deleteProfile(profile)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                HStack(spacing: 8) {
+                    Button("Save Current") {
+                        newProfileName = ""
+                        showsProfileNameInput = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!daemon.daemonOnline)
                 }
             }
             .settingsCard()

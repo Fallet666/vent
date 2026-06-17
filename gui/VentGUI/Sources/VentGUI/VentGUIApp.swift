@@ -286,6 +286,8 @@ final class VentDaemonManager: ObservableObject {
     @Published var isDownloadingUpdate = false
     @Published var updateDownloadProgress: Double = 0
     @Published var isInstallingUpdate = false
+    @Published var profiles: [VentProfile] = []
+    @Published var selectedProfileID: UUID?
 
     private var refreshTask: Task<Void, Never>?
     private var smoothedAverageTemperature: Double?
@@ -296,6 +298,7 @@ final class VentDaemonManager: ObservableObject {
     private init() {
         UserDefaults.standard.register(defaults: [Self.updateChecksEnabledKey: true])
         startRefreshLoop()
+        loadProfiles()
     }
 
     func refresh() {
@@ -874,5 +877,113 @@ struct FanState: Identifiable {
 
     var hasValidRange: Bool {
         maxRPM > minRPM
+    }
+}
+
+struct VentProfile: Codable, Identifiable, Equatable {
+    var id: UUID
+    var name: String
+    var mode: VentMode
+    var targetTemperature: Double
+    var separateFans: Bool
+    var fanRPMs: [Int]
+}
+
+extension VentDaemonManager {
+    private static let profilesKey = "savedProfiles"
+    private static let selectedProfileIDKey = "selectedProfileID"
+
+    var defaultProfile: VentProfile {
+        VentProfile(
+            id: UUID(),
+            name: "Default",
+            mode: .auto,
+            targetTemperature: config?.defaultTargetTemperature ?? 65,
+            separateFans: false,
+            fanRPMs: []
+        )
+    }
+
+    func loadProfiles() {
+        guard let data = UserDefaults.standard.data(forKey: Self.profilesKey),
+              let loaded = try? JSONDecoder().decode([VentProfile].self, from: data) else {
+            profiles = [defaultProfile]
+            return
+        }
+        profiles = loaded.isEmpty ? [defaultProfile] : loaded
+        if let savedID = UserDefaults.standard.string(forKey: Self.selectedProfileIDKey),
+           let uuid = UUID(uuidString: savedID),
+           profiles.contains(where: { $0.id == uuid }) {
+            selectedProfileID = uuid
+        } else {
+            selectedProfileID = profiles.first?.id
+        }
+    }
+
+    private func persistProfiles() {
+        guard let data = try? JSONEncoder().encode(profiles) else { return }
+        UserDefaults.standard.set(data, forKey: Self.profilesKey)
+        UserDefaults.standard.set(selectedProfileID?.uuidString, forKey: Self.selectedProfileIDKey)
+    }
+
+    func saveCurrentAsProfile(name: String) {
+        let rpmValues = fans.map { $0.currentRPM > 0 ? $0.currentRPM : $0.rpm }
+        let newProfile = VentProfile(
+            id: UUID(),
+            name: name,
+            mode: controlMode,
+            targetTemperature: targetTemperature,
+            separateFans: separateFans,
+            fanRPMs: rpmValues
+        )
+        profiles.append(newProfile)
+        selectedProfileID = newProfile.id
+        persistProfiles()
+    }
+
+    func applyProfile(_ profile: VentProfile) {
+        guard daemonOnline else { return }
+
+        selectedProfileID = profile.id
+        persistProfiles()
+
+        if profile.mode == .manualRPM {
+            separateFans = profile.separateFans
+        }
+
+        setControlMode(profile.mode)
+
+        if profile.mode == .autoTemp {
+            setTargetTemperature(profile.targetTemperature)
+        }
+
+        if profile.mode == .manualRPM {
+            for (index, rpmValue) in profile.fanRPMs.enumerated() {
+                guard index < fans.count else { break }
+                if profile.separateFans {
+                    setFan(index: fans[index].index, rpm: rpmValue)
+                } else {
+                    setAllFans(rpm: rpmValue)
+                    break
+                }
+            }
+        }
+    }
+
+    func deleteProfile(_ profile: VentProfile) {
+        profiles.removeAll { $0.id == profile.id }
+        if profiles.isEmpty {
+            profiles = [defaultProfile]
+        }
+        if selectedProfileID == profile.id {
+            selectedProfileID = profiles.first?.id
+        }
+        persistProfiles()
+    }
+
+    func renameProfile(_ profile: VentProfile, newName: String) {
+        guard let index = profiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        profiles[index].name = newName
+        persistProfiles()
     }
 }

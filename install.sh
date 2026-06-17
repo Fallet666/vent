@@ -37,9 +37,9 @@ sudo tee "$APP_DIR/Contents/Info.plist" > /dev/null << EOF
     <key>CFBundleDisplayName</key>
     <string>Vent</string>
     <key>CFBundleVersion</key>
-    <string>1.2.1</string>
+    <string>1.2.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.2.1</string>
+    <string>1.2.2</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>

@@ -194,7 +194,7 @@ struct VentDaemonTemperature {
     let value: Double
 }
 
-enum VentMode: String, CaseIterable, Identifiable {
+enum VentMode: String, CaseIterable, Identifiable, Codable {
     case auto
     case manualRPM
     case autoTemp
