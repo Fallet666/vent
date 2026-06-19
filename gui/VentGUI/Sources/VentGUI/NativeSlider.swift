@@ -45,7 +45,9 @@ struct NativeSlider: NSViewRepresentable {
     func updateNSView(_ nsView: NSSlider, context: Context) {
         nsView.minValue = range.lowerBound
         nsView.maxValue = range.upperBound
-        nsView.doubleValue = value
+        if !context.coordinator.isEditing {
+            nsView.doubleValue = value
+        }
         nsView.isEnabled = isEnabled
     }
 
@@ -55,10 +57,17 @@ struct NativeSlider: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         let parent: NativeSlider
-        private var isEditing = false
+        fileprivate(set) var isEditing = false
+        private var mouseUpMonitor: Any?
 
         init(_ parent: NativeSlider) {
             self.parent = parent
+        }
+
+        deinit {
+            if let monitor = mouseUpMonitor {
+                NSEvent.removeMonitor(monitor)
+            }
         }
 
         @objc func sliderChanged(_ sender: NSSlider) {
@@ -71,10 +80,31 @@ struct NativeSlider: NSViewRepresentable {
                 parent.value = rawValue
             }
 
-            let nowEditing = sender.isHighlighted
-            if nowEditing != isEditing {
-                isEditing = nowEditing
-                parent.onEditingChanged?(nowEditing)
+            let nowHighlighted = sender.isHighlighted
+            if nowHighlighted && !isEditing {
+                isEditing = true
+                parent.onEditingChanged?(true)
+                installMouseUpMonitor()
+            }
+        }
+
+        private func installMouseUpMonitor() {
+            removeMouseUpMonitor()
+            mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp]) { [weak self] event in
+                guard let self else { return event }
+                if self.isEditing {
+                    self.isEditing = false
+                    self.parent.onEditingChanged?(false)
+                    self.removeMouseUpMonitor()
+                }
+                return event
+            }
+        }
+
+        private func removeMouseUpMonitor() {
+            if let monitor = mouseUpMonitor {
+                NSEvent.removeMonitor(monitor)
+                mouseUpMonitor = nil
             }
         }
     }

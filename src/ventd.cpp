@@ -269,6 +269,7 @@ int main(int argc, char** argv) {
                             float speed = std::stof(parts[2]);
                             control_mode = ControlMode::ManualRPM;
                             overrides[fan_idx] = speed;
+                            backend->set_fan_target_speed(fan_idx, speed);
                             last_heartbeat = now;
                             response = "OK";
                         } else if (cmd == "SETP" && parts.size() >= 3) {
@@ -281,6 +282,7 @@ int main(int argc, char** argv) {
                                 float speed = fan->min_speed + range * (percent / 100.0f);
                                 control_mode = ControlMode::ManualRPM;
                                 overrides[fan_idx] = speed;
+                                backend->set_fan_target_speed(fan_idx, speed);
                                 response = "OK";
                             } else {
                                 response = "ERR Fan not found";
@@ -292,6 +294,7 @@ int main(int argc, char** argv) {
                             control_mode = ControlMode::ManualRPM;
                             for (const auto& fan : fans) {
                                 overrides[fan.index] = speed;
+                                backend->set_fan_target_speed(fan.index, speed);
                             }
                             last_heartbeat = now;
                             response = "OK";
