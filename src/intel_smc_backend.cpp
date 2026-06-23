@@ -620,13 +620,13 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
     return apply_keyed_manual_mode(index, manual);
 }
 
-static void merge_temps(std::vector<TemperatureInfo>& dest, std::vector<TemperatureInfo>&& source) {
-    for (auto& t : source) {
+static void merge_temps(std::vector<TemperatureInfo>& dest, const std::vector<TemperatureInfo>& source) {
+    for (const auto& t : source) {
         bool duplicate = false;
         for (const auto& existing : dest) {
             if (existing.key == t.key) { duplicate = true; break; }
         }
-        if (!duplicate) dest.push_back(std::move(t));
+        if (!duplicate) dest.push_back(t);
     }
 }
 
@@ -683,8 +683,14 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
         }
     }
 
-    auto hid_temps = read_hid_temperatures();
-    merge_temps(temps, std::move(hid_temps));
+    static std::vector<TemperatureInfo> cached_hid_temps;
+    static auto last_hid_read = std::chrono::steady_clock::time_point{};
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_hid_read >= std::chrono::seconds(5)) {
+        cached_hid_temps = read_hid_temperatures();
+        last_hid_read = now;
+    }
+    merge_temps(temps, cached_hid_temps);
 
     if (temps.empty()) {
         auto pm_temps = read_powermetrics_temperatures();

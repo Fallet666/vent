@@ -461,7 +461,7 @@ struct ContentView: View {
     }
 
     private var rpmSummaryText: String {
-        guard let rpm = rpmSummaryValue else { return "--" }
+        guard let rpm = rpmSummaryValue else { return "…" }
         return "\(rpm)"
     }
 
@@ -493,7 +493,7 @@ struct ContentView: View {
     }
 
     private func temperatureText(_ celsius: Double?) -> String {
-        guard let celsius else { return "-- \(temperatureUnit.symbol)" }
+        guard let celsius else { return "… \(temperatureUnit.symbol)" }
         return "\(Int(temperatureUnit.convert(celsius).rounded())) \(temperatureUnit.symbol)"
     }
 }

@@ -186,10 +186,12 @@ int main(int argc, char** argv) {
     uint64_t last_heartbeat = 0;
     uint64_t last_reconciliation = 0;
     uint64_t last_temperature_control = 0;
+    uint64_t last_temperature_cache = 0;
     ControlMode control_mode = ControlMode::Auto;
     float target_temperature = DEFAULT_TARGET_TEMPERATURE_C;
     float last_hottest_temperature = 0.0f;
     float last_auto_temperature_rpm = 0.0f;
+    std::vector<TemperatureInfo> cached_temperatures;
 
     auto now_ms = []() -> uint64_t {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -203,6 +205,12 @@ int main(int argc, char** argv) {
     last_heartbeat = now_ms();
     last_reconciliation = now_ms();
     last_temperature_control = now_ms();
+    last_temperature_cache = 0;
+
+    // Pre-populate temperature cache so first TEMPS is instant
+    cached_temperatures = backend->get_all_temperatures();
+    last_hottest_temperature = hottest_temperature(cached_temperatures);
+    last_temperature_cache = now_ms();
 
     // Main loop
     while (g_running) {
@@ -385,9 +393,8 @@ int main(int argc, char** argv) {
                                     std::to_string(fan.manual_mode ? 1 : 0);
                             }
                         } else if (cmd == "TEMPS") {
-                            auto temperatures = backend->get_all_temperatures();
-                            response = "TEMPS " + std::to_string(temperatures.size());
-                            for (const auto& temperature : temperatures) {
+                            response = "TEMPS " + std::to_string(cached_temperatures.size());
+                            for (const auto& temperature : cached_temperatures) {
                                 response += "\n" + temperature.key + " " + std::to_string(temperature.value);
                             }
                         } else if (cmd == "STATUS") {
@@ -430,14 +437,19 @@ int main(int argc, char** argv) {
             }
         }
 
+        // --- Temperature cache refresh (every 2 seconds) ---
+        if (now - last_temperature_cache >= static_cast<uint64_t>(AUTO_TEMPERATURE_INTERVAL_MS)) {
+            last_temperature_cache = now;
+            cached_temperatures = backend->get_all_temperatures();
+            last_hottest_temperature = hottest_temperature(cached_temperatures);
+        }
+
         // --- Auto temperature control (every 2 seconds) ---
         if (control_mode == ControlMode::AutoTemp &&
             (now - last_temperature_control >= static_cast<uint64_t>(AUTO_TEMPERATURE_INTERVAL_MS)))
         {
             last_temperature_control = now;
-            auto temperatures = backend->get_all_temperatures();
             auto fans = backend->get_all_fans();
-            last_hottest_temperature = hottest_temperature(temperatures);
             
             if (last_hottest_temperature > 0.0f && !fans.empty()) {
                 float min_speed = common_min_speed(fans);
