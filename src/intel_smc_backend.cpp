@@ -620,6 +620,16 @@ bool IntelSMCBackend::set_fan_manual_mode(uint32_t index, bool manual) {
     return apply_keyed_manual_mode(index, manual);
 }
 
+static void merge_temps(std::vector<TemperatureInfo>& dest, std::vector<TemperatureInfo>&& source) {
+    for (auto& t : source) {
+        bool duplicate = false;
+        for (const auto& existing : dest) {
+            if (existing.key == t.key) { duplicate = true; break; }
+        }
+        if (!duplicate) dest.push_back(std::move(t));
+    }
+}
+
 std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     std::vector<TemperatureInfo> temps;
     if (!initialized_) return temps;
@@ -640,13 +650,7 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
     uint32_t total = read_key_count();
     if (total == 0) {
         auto hid_temps = read_hid_temperatures();
-        for (auto& ht : hid_temps) {
-            bool duplicate = false;
-            for (const auto& existing : temps) {
-                if (existing.key == ht.key) { duplicate = true; break; }
-            }
-            if (!duplicate) temps.push_back(std::move(ht));
-        }
+        merge_temps(temps, std::move(hid_temps));
         if (temps.empty()) return read_powermetrics_temperatures();
         return temps;
     }
@@ -679,12 +683,15 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
         }
     }
 
-    if (!temps.empty()) return temps;
-    {
-        auto hid_temps = read_hid_temperatures();
-        if (!hid_temps.empty()) return hid_temps;
+    auto hid_temps = read_hid_temperatures();
+    merge_temps(temps, std::move(hid_temps));
+
+    if (temps.empty()) {
+        auto pm_temps = read_powermetrics_temperatures();
+        merge_temps(temps, std::move(pm_temps));
     }
-    return read_powermetrics_temperatures();
+
+    return temps;
 }
 
 std::string IntelSMCBackend::get_platform_name() const {

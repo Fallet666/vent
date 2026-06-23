@@ -83,17 +83,6 @@ Built for modern macOS (Apple Silicon and Intel). Uses a privileged launchd help
 
 ---
 
-## Screenshots 📸
-
-<p align="center">
-  <img src="screens/screenshot-1.png" width="280" alt="Auto mode">
-  <img src="screens/screenshot-2.png" width="280" alt="Manual RPM">
-  <img src="screens/screenshot-3.png" width="280" alt="Auto Temp">
-  <img src="screens/screenshot-4.png" width="280" alt="Settings">
-</p>
-
----
-
 ## Install 🚀
 
 ### Homebrew (recommended)
