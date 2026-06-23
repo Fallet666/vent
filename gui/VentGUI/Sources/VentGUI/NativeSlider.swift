@@ -58,16 +58,10 @@ struct NativeSlider: NSViewRepresentable {
     final class Coordinator: NSObject {
         let parent: NativeSlider
         fileprivate(set) var isEditing = false
-        private var mouseUpMonitor: Any?
+        private var debounceTimer: Timer?
 
         init(_ parent: NativeSlider) {
             self.parent = parent
-        }
-
-        deinit {
-            if let monitor = mouseUpMonitor {
-                NSEvent.removeMonitor(monitor)
-            }
         }
 
         @objc func sliderChanged(_ sender: NSSlider) {
@@ -80,31 +74,16 @@ struct NativeSlider: NSViewRepresentable {
                 parent.value = rawValue
             }
 
-            let nowHighlighted = sender.isHighlighted
-            if nowHighlighted && !isEditing {
+            if !isEditing {
                 isEditing = true
                 parent.onEditingChanged?(true)
-                installMouseUpMonitor()
             }
-        }
 
-        private func installMouseUpMonitor() {
-            removeMouseUpMonitor()
-            mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp]) { [weak self] event in
-                guard let self else { return event }
-                if self.isEditing {
-                    self.isEditing = false
-                    self.parent.onEditingChanged?(false)
-                    self.removeMouseUpMonitor()
-                }
-                return event
-            }
-        }
-
-        private func removeMouseUpMonitor() {
-            if let monitor = mouseUpMonitor {
-                NSEvent.removeMonitor(monitor)
-                mouseUpMonitor = nil
+            debounceTimer?.invalidate()
+            debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+                guard let self, self.isEditing else { return }
+                self.isEditing = false
+                self.parent.onEditingChanged?(false)
             }
         }
     }

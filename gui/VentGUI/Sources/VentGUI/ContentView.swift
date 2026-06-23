@@ -388,6 +388,9 @@ struct ContentView: View {
             return autoRPM
         }
         let values = daemon.fans.compactMap { fan -> Int? in
+            if daemon.controlMode == .manualRPM {
+                return fan.rpm > 0 ? fan.rpm : nil
+            }
             if fan.currentRPM > 0 {
                 return fan.currentRPM
             }

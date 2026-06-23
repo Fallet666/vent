@@ -554,7 +554,14 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setFan(index: Int, rpm: Int) {
-        guard daemonOnline, controlMode == .manualRPM else { return }
+        guard daemonOnline else { return }
+        if controlMode != .manualRPM {
+            guard VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: targetTemperature) else {
+                statusMessage = "Failed to switch to Manual RPM"
+                return
+            }
+            controlMode = .manualRPM
+        }
         let clampedRPM = clamped(rpm: rpm, for: index)
         if !separateFans {
             for fanIndex in fans.indices {
@@ -572,7 +579,14 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setAllFans(rpm: Int) {
-        guard daemonOnline, controlMode == .manualRPM else { return }
+        guard daemonOnline else { return }
+        if controlMode != .manualRPM {
+            guard VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: targetTemperature) else {
+                statusMessage = "Failed to switch to Manual RPM"
+                return
+            }
+            controlMode = .manualRPM
+        }
         let clampedRPM = clampedForAllFans(rpm: rpm)
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
@@ -657,7 +671,7 @@ final class VentDaemonManager: ObservableObject {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 self?.refresh()
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
     }

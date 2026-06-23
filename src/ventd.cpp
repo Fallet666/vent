@@ -372,11 +372,16 @@ int main(int argc, char** argv) {
                             auto fans = backend->get_all_fans();
                             response = "FANS " + std::to_string(fans.size());
                             for (const auto& fan : fans) {
+                                float target = fan.target_speed;
+                                auto it = overrides.find(fan.index);
+                                if (it != overrides.end()) {
+                                    target = it->second;
+                                }
                                 response += "\n" + std::to_string(fan.index) + " " +
                                     std::to_string((int)fan.current_speed) + " " +
                                     std::to_string((int)fan.min_speed) + " " +
                                     std::to_string((int)fan.max_speed) + " " +
-                                    std::to_string((int)fan.target_speed) + " " +
+                                    std::to_string((int)target) + " " +
                                     std::to_string(fan.manual_mode ? 1 : 0);
                             }
                         } else if (cmd == "TEMPS") {
