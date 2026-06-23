@@ -73,6 +73,8 @@ struct ContentView: View {
     private var mainView: some View {
         if daemon.daemonOnline {
             temperatureView
+            noiseWarningBanner
+            profilePickerView
             modePicker
             activeModeView
                 .transition(.asymmetric(
@@ -109,6 +111,91 @@ struct ContentView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var fansNoiseLevel: Double? {
+        let maxFanRPMs = daemon.fans.map { Double($0.maxRPM) }
+        let currentRPMs = daemon.fans.map { Double($0.currentRPM) }
+        guard let maxMax = maxFanRPMs.max(), maxMax > 0 else { return nil }
+        let maxCurrent = currentRPMs.max()!
+        let ratio = maxCurrent / maxMax
+        return ratio >= 0.7 ? ratio : nil
+    }
+
+    private var noiseWarningBanner: some View {
+        Group {
+            if let level = fansNoiseLevel {
+                HStack(spacing: 4) {
+                    Image(systemName: "speaker.wave.3.fill")
+                        .font(.caption2)
+                    Text("Fans at \(Int(level * 100))% — may be loud")
+                        .font(.caption2)
+                }
+                .foregroundColor(.orange)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 3)
+                .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: fansNoiseLevel != nil)
+    }
+
+    private var profilePickerView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(daemon.profiles) { profile in
+                    let isSelected = daemon.selectedProfileID == profile.id
+                    Button {
+                        daemon.applyProfile(profile)
+                    } label: {
+                        Text(profile.name)
+                            .font(.caption)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 1.2 : 0.7)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        if !profile.isStockProfile {
+                            Button("Rename") {
+                                profileForRename = profile
+                                renameText = profile.name
+                                showsRenameInput = true
+                            }
+                            Button("Delete", role: .destructive) {
+                                withAnimation {
+                                    daemon.deleteProfile(profile)
+                                }
+                            }
+                        }
+                    }
+                }
+                Button {
+                    newProfileName = ""
+                    showsProfileNameInput = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.primary.opacity(0.12), lineWidth: 0.7)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!daemon.daemonOnline)
+            }
+        }
     }
 
     private var modePicker: some View {
@@ -238,54 +325,43 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 ForEach(daemon.profiles) { profile in
-                    HStack {
-                        Text(profile.name)
-                            .font(.caption)
-                        Spacer()
-                        if daemon.selectedProfileID == profile.id {
-                            Image(systemName: "checkmark")
-                                .font(.caption)
-                                .foregroundColor(.accentColor)
-                        }
-                        Button("Rename") {
-                            profileForRename = profile
-                            renameText = profile.name
-                            showsRenameInput = true
-                        }
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        if daemon.profiles.count > 1 {
-                            Button("Delete") {
-                                withAnimation {
-                                    daemon.deleteProfile(profile)
+                    Button {
+                        daemon.applyProfile(profile)
+                    } label: {
+                        HStack {
+                            Text(profile.name)
+                            Spacer()
+                            if daemon.selectedProfileID == profile.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                            if !profile.isStockProfile {
+                                Button("Rename") {
+                                    profileForRename = profile
+                                    renameText = profile.name
+                                    showsRenameInput = true
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(.secondary)
+                                if daemon.profiles.count > 1 {
+                                    Button("Delete") {
+                                        withAnimation {
+                                            daemon.deleteProfile(profile)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundColor(.red)
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .font(.caption)
-                            .foregroundColor(.red)
                         }
                     }
+                    .buttonStyle(.plain)
                     .padding(.vertical, 2)
-                }
-                HStack(spacing: 8) {
-                    Button("Save Current") {
-                        newProfileName = ""
-                        showsProfileNameInput = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!daemon.daemonOnline)
                 }
             }
             .settingsCard()
 
             updatesSettingsView
-
-            Button("Quit Vent") {
-                daemon.quit()
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
         }
         .onChange(of: updateChecksAutomatically) { newValue in
             if newValue {
@@ -316,7 +392,6 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
             Toggle("Check for updates automatically", isOn: $updateChecksAutomatically)
             Toggle("Update helper with app", isOn: $updateDaemonWithGUI)
-                .font(.caption)
                 .help("When updating the app, also install the bundled helper daemon at the same time.")
             if let updateCheckMessage = daemon.updateCheckMessage {
                 Text(updateCheckMessage)

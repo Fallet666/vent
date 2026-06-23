@@ -296,7 +296,10 @@ final class VentDaemonManager: ObservableObject {
     private var updateDownloader: UpdateDownloader?
 
     private init() {
-        UserDefaults.standard.register(defaults: [Self.updateChecksEnabledKey: true])
+        UserDefaults.standard.register(defaults: [
+            Self.updateChecksEnabledKey: true,
+            "updateDaemonWithGUI": true
+        ])
         startRefreshLoop()
         loadProfiles()
     }
@@ -901,6 +904,17 @@ struct VentProfile: Codable, Identifiable, Equatable {
     var targetTemperature: Double
     var separateFans: Bool
     var fanRPMs: [Int]
+
+    var isStockProfile: Bool {
+        Self.stockProfileIDs.contains(id)
+    }
+
+    private static let stockProfileIDs: Set<UUID> = [
+        UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+        UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+        UUID(uuidString: "00000000-0000-0000-0000-000000000004")!,
+    ]
 }
 
 extension VentDaemonManager {
@@ -920,7 +934,7 @@ extension VentDaemonManager {
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
         name: "Normal",
         mode: .autoTemp,
-        targetTemperature: 65,
+        targetTemperature: 45,
         separateFans: false,
         fanRPMs: []
     )
@@ -934,9 +948,22 @@ extension VentDaemonManager {
         fanRPMs: []
     )
 
+    private static let lapProfile = VentProfile(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000004")!,
+        name: "Lap",
+        mode: .autoTemp,
+        targetTemperature: 30,
+        separateFans: false,
+        fanRPMs: []
+    )
+
     private static var stockProfiles: [VentProfile] {
-        [quietProfile, normalProfile, gamingProfile]
+        [quietProfile, normalProfile, gamingProfile, lapProfile]
     }
+
+    private static let stockProfileIDs: Set<UUID> = {
+        [quietProfile.id, normalProfile.id, gamingProfile.id, lapProfile.id]
+    }()
 
     func loadProfiles() {
         guard let data = UserDefaults.standard.data(forKey: Self.profilesKey),
@@ -948,6 +975,8 @@ extension VentDaemonManager {
             return
         }
         profiles = loaded
+        let customProfiles = profiles.filter { !$0.isStockProfile }
+        profiles = Self.stockProfiles + customProfiles
         if let savedID = UserDefaults.standard.string(forKey: Self.selectedProfileIDKey),
            let uuid = UUID(uuidString: savedID),
            profiles.contains(where: { $0.id == uuid }) {
