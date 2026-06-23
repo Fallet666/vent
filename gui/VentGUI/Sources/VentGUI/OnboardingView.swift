@@ -64,6 +64,7 @@ struct OnboardingView: View {
                         currentStep += 1
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(.accentColor)
                     .keyboardShortcut(.defaultAction)
 
                     Button("Skip") {
@@ -89,6 +90,7 @@ struct OnboardingView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
                         .keyboardShortcut(.defaultAction)
 
                         Button("Skip for now — I'll do it later") {

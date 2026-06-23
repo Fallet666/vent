@@ -637,13 +637,18 @@ std::vector<TemperatureInfo> IntelSMCBackend::get_all_temperatures() {
         temps.push_back(temperature);
     }
 
-    if (!temps.empty()) return temps;
-
     uint32_t total = read_key_count();
     if (total == 0) {
         auto hid_temps = read_hid_temperatures();
-        if (!hid_temps.empty()) return hid_temps;
-        return read_powermetrics_temperatures();
+        for (auto& ht : hid_temps) {
+            bool duplicate = false;
+            for (const auto& existing : temps) {
+                if (existing.key == ht.key) { duplicate = true; break; }
+            }
+            if (!duplicate) temps.push_back(std::move(ht));
+        }
+        if (temps.empty()) return read_powermetrics_temperatures();
+        return temps;
     }
 
     for (uint32_t i = 0; i < total; ++i) {

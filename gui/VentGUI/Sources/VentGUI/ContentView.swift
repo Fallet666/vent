@@ -89,7 +89,7 @@ struct ContentView: View {
     private var temperatureView: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("Average temperature")
+                Text("Temperature")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Text(temperatureText(daemon.averageTemperature))
@@ -110,7 +110,16 @@ struct ContentView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background {
+            if #available(macOS 26, *) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.1))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.08))
+            }
+        }
     }
 
     private var fansNoiseLevel: Double? {
@@ -208,12 +217,7 @@ struct ContentView: View {
             }
         }
         .pickerStyle(.segmented)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-                .padding(.horizontal, -6)
-                .padding(.vertical, -4)
-        )
+        .modeCard()
     }
 
     private var activeModeView: some View {
@@ -248,6 +252,7 @@ struct ContentView: View {
                 showsSettings = true
             }
             .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
     }
@@ -309,6 +314,7 @@ struct ContentView: View {
                     daemon.installOrUpdateDaemon()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
                 .disabled(daemon.isInstalling || daemon.isUninstalling)
                 if daemon.daemonOnline, daemon.helperVersion != nil {
                     Button(daemon.isUninstalling ? "Removing..." : "Uninstall Helper") {
@@ -418,6 +424,7 @@ struct ContentView: View {
                             daemon.downloadAndInstallUpdate()
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
                     }
                 }
             }
@@ -758,12 +765,30 @@ private extension View {
     func modeCard() -> some View {
         padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background {
+                if #available(macOS 26, *) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                }
+            }
     }
 
     func settingsCard() -> some View {
         padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background {
+                if #available(macOS 26, *) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                }
+            }
     }
 }

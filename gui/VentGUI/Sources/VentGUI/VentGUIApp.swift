@@ -195,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.worksWhenModal = true
         panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = hostingView
         return panel
     }
