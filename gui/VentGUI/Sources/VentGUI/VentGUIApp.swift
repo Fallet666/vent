@@ -42,13 +42,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         installOutsideClickMonitors()
 
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "q" {
-                self?.quit()
-                return nil
-            }
-            return event
-        }
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let quitItem = NSMenuItem(title: "Quit Vent", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.keyEquivalentModifierMask = [.command]
+        appMenuItem.submenu = NSMenu()
+        appMenuItem.submenu?.addItem(quitItem)
+        NSApplication.shared.mainMenu = mainMenu
 
         VentDaemonManager.shared.refresh()
         VentDaemonManager.shared.checkForUpdatesIfEnabled()
@@ -78,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showPopover()
         return true
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        VentDaemonManager.shared.quit()
+        return .terminateNow
     }
 
     @objc private func togglePopover() {
