@@ -604,6 +604,7 @@ struct ManualRPMModeView: View {
                     .environmentObject(daemon)
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: daemon.separateFans)
     }
 
     private var separateFanSliders: some View {

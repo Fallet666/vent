@@ -167,7 +167,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             var frame = panel.frame
             frame.origin = self.panelOrigin(for: button, panelSize: panelSize, screen: screen)
             frame.size = panelSize
-            panel.setFrame(frame, display: true, animate: false)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(frame, display: true)
+            }
         }
     }
 
@@ -347,7 +351,7 @@ final class VentDaemonManager: ObservableObject {
                         self.targetTemperature = daemonConfig.defaultTargetTemperature
                     }
                 }
-                self.fans = daemonFans.map { fan in
+                var newFans = daemonFans.map { fan in
                     let preferredRPM = fan.targetRPM > 0 ? fan.targetRPM : fan.currentRPM
                     let safeRPM = preferredRPM > 0 ? preferredRPM : fan.minRPM
                     return FanState(
@@ -358,6 +362,14 @@ final class VentDaemonManager: ObservableObject {
                         maxRPM: fan.maxRPM,
                         manualMode: fan.manualMode
                     )
+                }
+                if self.fans.count == newFans.count {
+                    for i in newFans.indices {
+                        newFans[i].rpm = self.fans[i].rpm
+                    }
+                }
+                if self.fans != newFans {
+                    self.fans = newFans
                 }
 
                 let fallbackAverageTemperature = self.hottestTemperature(from: temperatures)
@@ -910,7 +922,7 @@ enum VentInstaller {
     }
 }
 
-struct FanState: Identifiable {
+struct FanState: Identifiable, Equatable {
     let id = UUID()
     let index: Int
     var rpm: Int
@@ -921,6 +933,11 @@ struct FanState: Identifiable {
 
     var hasValidRange: Bool {
         maxRPM > minRPM
+    }
+
+    static func == (lhs: FanState, rhs: FanState) -> Bool {
+        lhs.index == rhs.index && lhs.rpm == rhs.rpm && lhs.currentRPM == rhs.currentRPM &&
+        lhs.minRPM == rhs.minRPM && lhs.maxRPM == rhs.maxRPM && lhs.manualMode == rhs.manualMode
     }
 }
 
