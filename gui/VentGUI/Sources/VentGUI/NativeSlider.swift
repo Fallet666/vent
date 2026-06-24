@@ -64,6 +64,10 @@ struct NativeSlider: NSViewRepresentable {
             self.parent = parent
         }
 
+        deinit {
+            debounceTimer?.invalidate()
+        }
+
         @objc func sliderChanged(_ sender: NSSlider) {
             let rawValue = sender.doubleValue
             if parent.step > 0 {

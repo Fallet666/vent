@@ -39,9 +39,20 @@ final class VentDaemonClient {
             return nil
         }
 
+        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        setsockopt(socketDescriptor, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(socketDescriptor, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
         let commandLine = command + "\n"
         commandLine.withCString { pointer in
-            _ = write(socketDescriptor, pointer, commandLine.utf8.count)
+            var remaining = commandLine.utf8.count
+            var offset = 0
+            while remaining > 0 {
+                let written = write(socketDescriptor, pointer.advanced(by: offset), remaining)
+                guard written > 0 else { return }
+                offset += written
+                remaining -= written
+            }
         }
 
         var buffer = [UInt8](repeating: 0, count: 16_384)

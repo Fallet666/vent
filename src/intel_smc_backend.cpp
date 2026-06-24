@@ -253,6 +253,7 @@ bool IntelSMCBackend::initialize() {
 }
 
 void IntelSMCBackend::shutdown() {
+    stop_all_persistent_fan_control();
     if (initialized_) {
         IOServiceClose(connection_);
         connection_ = 0;
@@ -754,7 +755,6 @@ bool IntelSMCBackend::start_persistent_fan_control(uint32_t index, float target_
         }
     });
 
-    control.thread.detach();
     return true;
 }
 
@@ -768,6 +768,10 @@ bool IntelSMCBackend::stop_persistent_fan_control(uint32_t index) {
 
     control.running.store(false);
 
+    if (control.thread.joinable()) {
+        control.thread.join();
+    }
+
     return true;
 }
 
@@ -776,6 +780,9 @@ void IntelSMCBackend::stop_all_persistent_fan_control() {
     for (auto& control : persistent_controls_) {
         if (control.running.load()) {
             control.running.store(false);
+        }
+        if (control.thread.joinable()) {
+            control.thread.join();
         }
     }
 }

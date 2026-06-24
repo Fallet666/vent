@@ -162,22 +162,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func resizePanelToFitContent() {
         guard let panel,
               panel.isVisible else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self,
-                  let panel = self.panel,
-                  let button = self.statusItem?.button,
-                  let buttonWindow = button.window,
-                  let screen = buttonWindow.screen ?? NSScreen.main else { return }
-            panel.contentView?.layoutSubtreeIfNeeded()
-            let panelSize = self.adaptivePanelSize(for: panel, screen: screen)
-            var frame = panel.frame
-            frame.origin = self.panelOrigin(for: button, panelSize: panelSize, screen: screen)
-            frame.size = panelSize
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().setFrame(frame, display: true)
-            }
+        guard let button = statusItem?.button,
+              let buttonWindow = button.window,
+              let screen = buttonWindow.screen ?? NSScreen.main else { return }
+        panel.contentView?.layoutSubtreeIfNeeded()
+        let panelSize = self.adaptivePanelSize(for: panel, screen: screen)
+        var frame = panel.frame
+        frame.origin = self.panelOrigin(for: button, panelSize: panelSize, screen: screen)
+        frame.size = panelSize
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(frame, display: true)
         }
     }
 
@@ -388,7 +384,9 @@ final class VentDaemonManager: ObservableObject {
                     self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
                 }
                 self.daemonOnline = true
-                self.statusMessage = "Ready"
+                if self.statusMessage != "Ready" {
+                    self.statusMessage = "Ready"
+                }
                 self.isRefreshing = false
             }
         }
@@ -933,7 +931,7 @@ enum VentInstaller {
 }
 
 struct FanState: Identifiable, Equatable {
-    let id = UUID()
+    var id: Int { index }
     let index: Int
     var rpm: Int
     var currentRPM: Int
