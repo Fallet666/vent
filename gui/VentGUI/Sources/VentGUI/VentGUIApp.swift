@@ -342,6 +342,7 @@ final class VentDaemonManager: ObservableObject {
             targetTemperature = modeStatus.targetTemperature
             averageTemperature = smoothedTemperature(modeStatus.averageTemperature ?? fallbackAverageTemperature)
             autoTemperatureRPM = modeStatus.autoRPM
+            syncSelectedProfileWithDaemon(mode: modeStatus.mode, targetTemp: modeStatus.targetTemperature)
         } else {
             averageTemperature = smoothedTemperature(fallbackAverageTemperature)
         }
@@ -698,7 +699,8 @@ final class VentDaemonManager: ObservableObject {
                     temperature.value >= (config?.minUsableTemperature ?? 0) &&
                     temperature.value < (config?.maxUsableTemperature ?? Double.greatestFiniteMagnitude) &&
                     !temperature.key.hasPrefix("Ta") &&
-                    !temperature.key.hasPrefix("Tp")
+                    !temperature.key.hasPrefix("Tp") &&
+                    !temperature.key.contains("cal")
             }
             .map(\.value)
         guard !validTemperatures.isEmpty else { return nil }
@@ -1051,5 +1053,23 @@ extension VentDaemonManager {
         guard let index = profiles.firstIndex(where: { $0.id == profile.id }) else { return }
         profiles[index].name = newName
         persistProfiles()
+    }
+
+    private func syncSelectedProfileWithDaemon(mode: VentMode, targetTemp: Double) {
+        let match: VentProfile? = {
+            switch mode {
+            case .auto:
+                return profiles.first { $0.mode == .auto && $0.isStockProfile }
+            case .autoTemp:
+                return profiles.filter({ $0.mode == .autoTemp && $0.isStockProfile })
+                    .min(by: { abs($0.targetTemperature - targetTemp) < abs($1.targetTemperature - targetTemp) })
+            case .manualRPM:
+                return nil
+            }
+        }()
+        if let match {
+            selectedProfileID = match.id
+            persistProfiles()
+        }
     }
 }

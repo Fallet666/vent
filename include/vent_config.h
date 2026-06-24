@@ -15,7 +15,8 @@ constexpr float AUTO_TEMPERATURE_FULL_SPEED_SPAN_C = 25.0f;
 constexpr int AUTO_TEMPERATURE_INTERVAL_MS = 2000;
 
 inline bool is_temperature_key_usable(const std::string& key) {
-    return key.rfind("Ta", 0) != 0 && key.rfind("Tp", 0) != 0;
+    return key.rfind("Ta", 0) != 0 && key.rfind("Tp", 0) != 0 &&
+        key.find("cal") == std::string::npos && key.find("CAL") == std::string::npos;
 }
 
 inline bool is_temperature_usable(const std::string& key, float value) {
