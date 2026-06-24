@@ -42,6 +42,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         installOutsideClickMonitors()
 
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "q" {
+                self?.quit()
+                return nil
+            }
+            return event
+        }
+
         VentDaemonManager.shared.refresh()
         VentDaemonManager.shared.checkForUpdatesIfEnabled()
 
@@ -283,6 +291,7 @@ final class VentDaemonManager: ObservableObject {
     @Published var latestReleaseURL: URL?
     @Published var updateCheckMessage: String?
     @Published var isCheckingForUpdates = false
+    @Published var isRefreshing = false
     @Published var isDownloadingUpdate = false
     @Published var updateDownloadProgress: Double = 0
     @Published var isInstallingUpdate = false
@@ -305,48 +314,66 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func refresh() {
-        daemonOnline = VentDaemonClient.shared.isRunning()
-        guard daemonOnline else {
-            fans = []
-            averageTemperature = nil
-            helperVersion = nil
-            statusMessage = "Helper not installed"
-            return
-        }
+        guard !isRefreshing else { return }
+        isRefreshing = true
 
-        helperVersion = VentDaemonClient.shared.version()
-        let daemonFans = VentDaemonClient.shared.fans() ?? []
-        if let daemonConfig = VentDaemonClient.shared.config() {
-            config = daemonConfig
-            if targetTemperature <= 0 {
-                targetTemperature = daemonConfig.defaultTargetTemperature
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+
+            let online = VentDaemonClient.shared.isRunning()
+            guard online else {
+                DispatchQueue.main.async {
+                    self.isRefreshing = false
+                    self.fans = []
+                    self.averageTemperature = nil
+                    self.helperVersion = nil
+                    self.statusMessage = "Helper not installed"
+                }
+                return
+            }
+
+            let version = VentDaemonClient.shared.version()
+            let daemonFans = VentDaemonClient.shared.fans() ?? []
+            let daemonConfig = VentDaemonClient.shared.config()
+            let temperatures = VentDaemonClient.shared.temperatures() ?? []
+            let modeStatus = VentDaemonClient.shared.modeStatus()
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.helperVersion = version
+                if let daemonConfig {
+                    self.config = daemonConfig
+                    if self.targetTemperature <= 0 {
+                        self.targetTemperature = daemonConfig.defaultTargetTemperature
+                    }
+                }
+                self.fans = daemonFans.map { fan in
+                    let preferredRPM = fan.targetRPM > 0 ? fan.targetRPM : fan.currentRPM
+                    let safeRPM = preferredRPM > 0 ? preferredRPM : fan.minRPM
+                    return FanState(
+                        index: fan.index,
+                        rpm: safeRPM,
+                        currentRPM: fan.currentRPM,
+                        minRPM: fan.minRPM,
+                        maxRPM: fan.maxRPM,
+                        manualMode: fan.manualMode
+                    )
+                }
+
+                let fallbackAverageTemperature = self.hottestTemperature(from: temperatures)
+                if let modeStatus {
+                    self.controlMode = modeStatus.mode
+                    self.targetTemperature = modeStatus.targetTemperature
+                    self.averageTemperature = self.smoothedTemperature(modeStatus.averageTemperature ?? fallbackAverageTemperature)
+                    self.autoTemperatureRPM = modeStatus.autoRPM
+                } else {
+                    self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
+                }
+                self.daemonOnline = true
+                self.statusMessage = "Ready"
+                self.isRefreshing = false
             }
         }
-        fans = daemonFans.map { fan in
-            let preferredRPM = fan.targetRPM > 0 ? fan.targetRPM : fan.currentRPM
-            let safeRPM = preferredRPM > 0 ? preferredRPM : fan.minRPM
-            return FanState(
-                index: fan.index,
-                rpm: safeRPM,
-                currentRPM: fan.currentRPM,
-                minRPM: fan.minRPM,
-                maxRPM: fan.maxRPM,
-                manualMode: fan.manualMode
-            )
-        }
-
-        let temperatures = VentDaemonClient.shared.temperatures() ?? []
-            let fallbackAverageTemperature = hottestTemperature(from: temperatures)
-        if let modeStatus = VentDaemonClient.shared.modeStatus() {
-            controlMode = modeStatus.mode
-            targetTemperature = modeStatus.targetTemperature
-            averageTemperature = smoothedTemperature(modeStatus.averageTemperature ?? fallbackAverageTemperature)
-            autoTemperatureRPM = modeStatus.autoRPM
-            syncSelectedProfileWithDaemon(mode: modeStatus.mode, targetTemp: modeStatus.targetTemperature)
-        } else {
-            averageTemperature = smoothedTemperature(fallbackAverageTemperature)
-        }
-        statusMessage = "Ready"
     }
 
     var helperNeedsUpdate: Bool {
@@ -535,14 +562,11 @@ final class VentDaemonManager: ObservableObject {
 
     func setControlMode(_ mode: VentMode) {
         guard daemonOnline else { return }
+        selectedProfileID = nil
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
-        let ok = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
-        if ok {
-            controlMode = mode
-            statusMessage = "Mode: \(mode.title)"
-            refresh()
-        } else {
-            statusMessage = "Failed to set \(mode.title)"
+        controlMode = mode
+        DispatchQueue.global(qos: .userInitiated).async {
+            let _ = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
         }
     }
 
@@ -552,58 +576,59 @@ final class VentDaemonManager: ObservableObject {
         } else {
             targetTemperature = temperature
         }
+        selectedProfileID = nil
         guard daemonOnline, controlMode == .autoTemp else { return }
-        statusMessage = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: targetTemperature) ?
-            "Target temperature updated" : "Failed to set target temperature"
+        let temp = targetTemperature
+        DispatchQueue.global(qos: .userInitiated).async {
+            let _ = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
+        }
     }
 
     func setFan(index: Int, rpm: Int) {
         guard daemonOnline else { return }
-        if controlMode != .manualRPM {
-            guard VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: targetTemperature) else {
-                statusMessage = "Failed to switch to Manual RPM"
-                return
-            }
-            controlMode = .manualRPM
-        }
+        selectedProfileID = nil
         let clampedRPM = clamped(rpm: rpm, for: index)
-        if !separateFans {
-            for fanIndex in fans.indices {
-                fans[fanIndex].rpm = clampedRPM
+        let currentMode = controlMode
+        let temp = targetTemperature
+        let isSeparate = separateFans
+        if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
+            fans[fanIndex].rpm = clampedRPM
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            if currentMode != .manualRPM {
+                VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
             }
-            statusMessage = VentDaemonClient.shared.setAllFans(rpm: clampedRPM) ?
-                "All fans set to \(clampedRPM) RPM" : "Failed to set all fans"
-        } else {
-            if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
-                fans[fanIndex].rpm = clampedRPM
+            if isSeparate {
+                let _ = VentDaemonClient.shared.setFan(index: index, rpm: clampedRPM)
+            } else {
+                let _ = VentDaemonClient.shared.setAllFans(rpm: clampedRPM)
             }
-            statusMessage = VentDaemonClient.shared.setFan(index: index, rpm: clampedRPM) ?
-                "Fan #\(index) set to \(clampedRPM) RPM" : "Failed to set fan #\(index)"
         }
     }
 
     func setAllFans(rpm: Int) {
         guard daemonOnline else { return }
-        if controlMode != .manualRPM {
-            guard VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: targetTemperature) else {
-                statusMessage = "Failed to switch to Manual RPM"
-                return
-            }
-            controlMode = .manualRPM
-        }
+        selectedProfileID = nil
         let clampedRPM = clampedForAllFans(rpm: rpm)
+        let currentMode = controlMode
+        let temp = targetTemperature
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
         }
-        statusMessage = VentDaemonClient.shared.setAllFans(rpm: clampedRPM) ?
-            "All fans set to \(clampedRPM) RPM" : "Failed to set all fans"
+        DispatchQueue.global(qos: .userInitiated).async {
+            if currentMode != .manualRPM {
+                let _ = VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
+            }
+            let _ = VentDaemonClient.shared.setAllFans(rpm: clampedRPM)
+        }
     }
 
     func setAutoAll() {
         guard daemonOnline else { return }
-        statusMessage = VentDaemonClient.shared.setMode(.auto) ?
-            "macOS controls fans automatically" : "Failed to return fans to auto mode"
-        refresh()
+        selectedProfileID = nil
+        DispatchQueue.global(qos: .userInitiated).async {
+            let _ = VentDaemonClient.shared.setMode(.auto)
+        }
     }
 
     func installOrUpdateDaemon() {
@@ -1015,25 +1040,32 @@ extension VentDaemonManager {
         selectedProfileID = profile.id
         persistProfiles()
 
-        if profile.mode == .manualRPM {
-            separateFans = profile.separateFans
-        }
+        let mode = profile.mode
+        let temp = profile.targetTemperature
+        let separate = profile.separateFans
+        let rpms = profile.fanRPMs
+        let fanCount = fans.count
 
-        setControlMode(profile.mode)
-
-        if profile.mode == .autoTemp {
-            setTargetTemperature(profile.targetTemperature)
-        }
-
-        if profile.mode == .manualRPM {
-            for (index, rpmValue) in profile.fanRPMs.enumerated() {
-                guard index < fans.count else { break }
-                if profile.separateFans {
-                    setFan(index: fans[index].index, rpm: rpmValue)
+        DispatchQueue.global(qos: .userInitiated).async {
+            VentDaemonClient.shared.setMode(mode, targetTemperature: temp)
+            if mode == .autoTemp {
+                VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
+            }
+            if mode == .manualRPM {
+                if !separate, let firstRPM = rpms.first {
+                    VentDaemonClient.shared.setAllFans(rpm: firstRPM)
                 } else {
-                    setAllFans(rpm: rpmValue)
-                    break
+                    for (index, rpmValue) in rpms.enumerated() {
+                        guard index < fanCount else { break }
+                        VentDaemonClient.shared.setFan(index: index, rpm: rpmValue)
+                    }
                 }
+            }
+        }
+
+        DispatchQueue.main.async {
+            if mode == .manualRPM {
+                self.separateFans = separate
             }
         }
     }

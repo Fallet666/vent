@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(vent VERSION 1.2.10 LANGUAGES CXX)
+project(vent VERSION 1.2.11 LANGUAGES CXX)
 
 include(CTest)
 
