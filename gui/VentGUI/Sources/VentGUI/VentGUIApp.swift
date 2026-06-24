@@ -583,8 +583,12 @@ final class VentDaemonManager: ObservableObject {
         selectedProfileID = nil
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
         controlMode = mode
+        let rpm = commonRPM
         DispatchQueue.global(qos: .userInitiated).async {
             let _ = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
+            if mode == .manualRPM {
+                let _ = VentDaemonClient.shared.setAllFans(rpm: rpm)
+            }
         }
     }
 
