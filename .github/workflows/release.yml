@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
     runs-on: macos-14
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -18,11 +20,53 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_NOTES=$(cat << 'NOTES'
+          ## What's New
+          {{#body}}
+          NOTES
+          )" >> $GITHUB_ENV
+
+      - name: Update version in source
+        run: |
+          sed -i '' "s/APP_VERSION = \"[^\"]*\"/APP_VERSION = \"${{ env.VERSION }}\"/" include/daemon_ipc.h
+          grep APP_VERSION include/daemon_ipc.h
+
       - name: Build DMG
-        run: VERSION="${GITHUB_REF_NAME#v}" ./package_dmg.sh
+        env:
+          VERSION: ${{ env.VERSION }}
+          VERSION_FORCE: "1"
+        run: ./package_dmg.sh
+
+      - name: Run Swift tests
+        run: |
+          cd gui/VentGUI
+          swift test -c release
+
+      - name: Compute checksum
+        run: |
+          echo "SHA256=$(shasum -a 256 dist/Vent-${{ env.VERSION }}.dmg | cut -d' ' -f1)" >> $GITHUB_ENV
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: dist/Vent-${{ env.VERSION }}.dmg
           generate_release_notes: true
+          prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
+
+      - name: Update homebrew-tap
+        run: |
+          HOMEBREW_DIR=$(mktemp -d)
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-tap.git "$HOMEBREW_DIR"
+          cd "$HOMEBREW_DIR"
+          sed -i '' "s/version \"[^\"]*\"/version \"${{ env.VERSION }}\"/" Casks/vent.rb
+          sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"${{ env.SHA256 }}\"/" Casks/vent.rb
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+          git add Casks/vent.rb
+          git commit -m "vent ${{ env.VERSION }}"
+          git push
+          rm -rf "$HOMEBREW_DIR"
