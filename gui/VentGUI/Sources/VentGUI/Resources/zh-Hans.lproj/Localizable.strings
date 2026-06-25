@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "温度";
+"RPM" = "RPM";
+"Mode" = "模式";
+"Settings" = "设置";
+"Manage helper and preferences" = "管理辅助工具和偏好设置";
+"Rename" = "重命名";
+"Delete" = "删除";
+"Save" = "保存";
+"Cancel" = "取消";
+"OK" = "确定";
+"Next" = "下一步";
+"Skip" = "跳过";
+"Profile name" = "配置名称";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "风扇正在高速运转，可能很吵。";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "风扇 %d%% — 可能很吵";
+
+/* Settings */
+"Temperature Unit" = "温度单位";
+"Launch at Login" = "登录时启动";
+"Notify when fans are loud" = "风扇很吵时通知";
+"Useful for hearing impaired" = "适合听力障碍人士";
+"Helper" = "辅助工具";
+"Profiles" = "配置";
+"App version: %@" = "应用版本: %@";
+"Helper version: %@" = "辅助工具版本: %@";
+"Update available" = "有可用更新";
+"Install Helper" = "安装辅助工具";
+"Updating Helper..." = "正在更新辅助工具...";
+"Uninstall Helper" = "卸载辅助工具";
+"Removing..." = "正在删除...";
+
+/* Updates */
+"Check for Updates" = "检查更新";
+"Checking for updates..." = "正在检查更新...";
+"Version %@ is available" = "版本 %@ 可用";
+"Vent is up to date" = "Vent已是最新版本";
+"Could not check for updates" = "无法检查更新";
+"Download URL not available" = "下载链接不可用";
+"Starting download..." = "开始下载...";
+"Downloading... %d%%" = "下载中... %d%%";
+"Download failed: %@" = "下载失败: %@";
+"Installing..." = "正在安装...";
+"Install failed: %@" = "安装失败: %@";
+"Install and Restart" = "安装并重启";
+"Updates" = "更新";
+"Automatically check for updates" = "自动检查更新";
+"Update helper with app" = "随应用更新辅助工具";
+
+/* Onboarding */
+"Welcome to Vent" = "欢迎使用 Vent";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Vent 根据温度控制 Mac 的风扇。\n凉爽时更安静，炎热时更强力。";
+"Privileged Helper" = "特权辅助工具";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Vent 需要具有管理员访问权限的\n辅助工具守护进程来控制风扇。\n系统会要求您输入密码。";
+"Independent Updates" = "独立更新";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "辅助工具可以与应用分开更新。\n随时在设置中点击\n「更新辅助工具」即可。";
+"Loud Fan Alerts" = "吵闹风扇提醒";
+"Get a notification when fans are\nrunning at high speed." = "当风扇高速运转时\n接收通知。";
+"Skip for now — I'll do it later" = "暂时跳过 — 稍后再说";
+"Installing..." = "正在安装...";
+
+/* Status */
+"Connecting..." = "连接中...";
+"Helper not installed" = "辅助工具未安装";
+"Ready" = "就绪";
+"not installed" = "未安装";
+
+/* Errors */
+"Error" = "错误";
+"Error installing helper: %@" = "安装辅助工具出错: %@";
+"Error uninstalling helper: %@" = "卸载辅助工具出错: %@";
+
+/* Fan modes */
+"Auto" = "自动";
+"Auto Temp" = "自动温度";
+"Manual RPM" = "手动RPM";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "摄氏度";
+"Fahrenheit" = "华氏度";
+
+/* Menu */
+"Quit Vent" = "退出 Vent";

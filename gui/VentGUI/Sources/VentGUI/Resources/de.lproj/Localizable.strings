@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "Temperatur";
+"RPM" = "RPM";
+"Mode" = "Modus";
+"Settings" = "Einstellungen";
+"Manage helper and preferences" = "Helper und Einstellungen verwalten";
+"Rename" = "Umbenennen";
+"Delete" = "Löschen";
+"Save" = "Speichern";
+"Cancel" = "Abbrechen";
+"OK" = "OK";
+"Next" = "Weiter";
+"Skip" = "Überspringen";
+"Profile name" = "Profilname";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "Lüfter laufen mit hoher Geschwindigkeit und können laut sein.";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "Lüfter bei %d%% — können laut sein";
+
+/* Settings */
+"Temperature Unit" = "Temperatureinheit";
+"Launch at Login" = "Bei Anmeldung starten";
+"Notify when fans are loud" = "Benachrichtigen wenn Lüfter laut sind";
+"Useful for hearing impaired" = "Nützlich für Hörbehinderte";
+"Helper" = "Helper";
+"Profiles" = "Profile";
+"App version: %@" = "App-Version: %@";
+"Helper version: %@" = "Helper-Version: %@";
+"Update available" = "Update verfügbar";
+"Install Helper" = "Helper installieren";
+"Updating Helper..." = "Helper wird aktualisiert...";
+"Uninstall Helper" = "Helper deinstallieren";
+"Removing..." = "Wird entfernt...";
+
+/* Updates */
+"Check for Updates" = "Nach Updates suchen";
+"Checking for updates..." = "Suche nach Updates...";
+"Version %@ is available" = "Version %@ verfügbar";
+"Vent is up to date" = "Vent ist aktuell";
+"Could not check for updates" = "Updates konnten nicht geprüft werden";
+"Download URL not available" = "Download-URL nicht verfügbar";
+"Starting download..." = "Download startet...";
+"Downloading... %d%%" = "Lade herunter... %d%%";
+"Download failed: %@" = "Download fehlgeschlagen: %@";
+"Installing..." = "Installiere...";
+"Install failed: %@" = "Installation fehlgeschlagen: %@";
+"Install and Restart" = "Installieren und neustarten";
+"Updates" = "Updates";
+"Automatically check for updates" = "Automatisch nach Updates suchen";
+"Update helper with app" = "Helper mit App aktualisieren";
+
+/* Onboarding */
+"Welcome to Vent" = "Willkommen bei Vent";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Vent steuert die Lüfter deines Macs\nbasierend auf der Temperatur — leiser wenn kühl,\nstärker wenn heiß.";
+"Privileged Helper" = "Privilegierter Helper";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Vent benötigt einen Helper-Daemon mit\nAdmin-Zugriff um die Lüfter zu steuern.\nDu wirst nach deinem Passwort gefragt.";
+"Independent Updates" = "Unabhängige Updates";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "Der Helper kann separat von der App\naktualisiert werden — klicke einfach auf\n\"Helper aktualisieren\" in den Einstellungen.";
+"Loud Fan Alerts" = "Lautstärkewarnungen";
+"Get a notification when fans are\nrunning at high speed." = "Erhalte eine Benachrichtigung wenn Lüfter\nmit hoher Geschwindigkeit laufen.";
+"Skip for now — I'll do it later" = "Überspringen — ich mache es später";
+"Installing..." = "Installiere...";
+
+/* Status */
+"Connecting..." = "Verbinde...";
+"Helper not installed" = "Helper nicht installiert";
+"Ready" = "Bereit";
+"not installed" = "nicht installiert";
+
+/* Errors */
+"Error" = "Fehler";
+"Error installing helper: %@" = "Fehler bei Helper-Installation: %@";
+"Error uninstalling helper: %@" = "Fehler bei Helper-Deinstallation: %@";
+
+/* Fan modes */
+"Auto" = "Auto";
+"Auto Temp" = "Auto Temp";
+"Manual RPM" = "Manuell RPM";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "Celsius";
+"Fahrenheit" = "Fahrenheit";
+
+/* Menu */
+"Quit Vent" = "Vent beenden";

@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "온도";
+"RPM" = "RPM";
+"Mode" = "모드";
+"Settings" = "설정";
+"Manage helper and preferences" = "헬퍼 및 환경설정 관리";
+"Rename" = "이름 변경";
+"Delete" = "삭제";
+"Save" = "저장";
+"Cancel" = "취소";
+"OK" = "확인";
+"Next" = "다음";
+"Skip" = "건너뛰기";
+"Profile name" = "프로필 이름";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "팬이 고속으로运转하여 시끄러울 수 있습니다.";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "팬 %d%% — 시끄러울 수 있음";
+
+/* Settings */
+"Temperature Unit" = "온도 단위";
+"Launch at Login" = "로그인 시 실행";
+"Notify when fans are loud" = "팬이 시끄러울 때 알림";
+"Useful for hearing impaired" = "청각 장애인을 위한 유용한 기능";
+"Helper" = "헬퍼";
+"Profiles" = "프로필";
+"App version: %@" = "앱 버전: %@";
+"Helper version: %@" = "헬퍼 버전: %@";
+"Update available" = "업데이트 가능";
+"Install Helper" = "헬퍼 설치";
+"Updating Helper..." = "헬퍼 업데이트 중...";
+"Uninstall Helper" = "헬퍼 제거";
+"Removing..." = "제거 중...";
+
+/* Updates */
+"Check for Updates" = "업데이트 확인";
+"Checking for updates..." = "업데이트 확인 중...";
+"Version %@ is available" = "버전 %@ 사용 가능";
+"Vent is up to date" = "Vent는 최신 버전입니다";
+"Could not check for updates" = "업데이트를 확인할 수 없습니다";
+"Download URL not available" = "다운로드 URL 사용 불가";
+"Starting download..." = "다운로드 시작...";
+"Downloading... %d%%" = "다운로드 중... %d%%";
+"Download failed: %@" = "다운로드 실패: %@";
+"Installing..." = "설치 중...";
+"Install failed: %@" = "설치 실패: %@";
+"Install and Restart" = "설치 및 재시작";
+"Updates" = "업데이트";
+"Automatically check for updates" = "자동으로 업데이트 확인";
+"Update helper with app" = "앱과 함께 헬퍼 업데이트";
+
+/* Onboarding */
+"Welcome to Vent" = "Vent에 오신 것을 환영합니다";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Vent는 온도에 따라 Mac 팬을 제어합니다.\n시원할 때는 조용하게, 더울 때는 강하게 작동합니다.";
+"Privileged Helper" = "권한 헬퍼";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Vent는 팬을 제어하기 위해\n관리자 접근 권한이 있는 헬퍼 데몬이 필요합니다.\n비밀번호를 입력하라는 메시지가 표시됩니다.";
+"Independent Updates" = "독립적 업데이트";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "헬퍼는 앱과 별도로 업데이트할 수 있습니다.\n설정에서 언제든지\n\"헬퍼 업데이트\"를 클릭하세요.";
+"Loud Fan Alerts" = "시끄러운 팬 알림";
+"Get a notification when fans are\nrunning at high speed." = "팬이 고속으로 작동할 때\n알림을 받으세요.";
+"Skip for now — I'll do it later" = "지금은 건너뛰기 — 나중에 하겠습니다";
+"Installing..." = "설치 중...";
+
+/* Status */
+"Connecting..." = "연결 중...";
+"Helper not installed" = "헬퍼가 설치되지 않음";
+"Ready" = "준비 완료";
+"not installed" = "설치되지 않음";
+
+/* Errors */
+"Error" = "오류";
+"Error installing helper: %@" = "헬퍼 설치 오류: %@";
+"Error uninstalling helper: %@" = "헬퍼 제거 오류: %@";
+
+/* Fan modes */
+"Auto" = "자동";
+"Auto Temp" = "자동 온도";
+"Manual RPM" = "수동 RPM";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "섭씨";
+"Fahrenheit" = "화씨";
+
+/* Menu */
+"Quit Vent" = "Vent 종료";

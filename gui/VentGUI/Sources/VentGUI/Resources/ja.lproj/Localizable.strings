@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "温度";
+"RPM" = "RPM";
+"Mode" = "モード";
+"Settings" = "設定";
+"Manage helper and preferences" = "ヘルパーと設定を管理";
+"Rename" = "名前を変更";
+"Delete" = "削除";
+"Save" = "保存";
+"Cancel" = "キャンセル";
+"OK" = "OK";
+"Next" = "次へ";
+"Skip" = "スキップ";
+"Profile name" = "プロファイル名";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "ファンが高转速で稼働しているため、うるさい場合があります。";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "ファン %d%% — うるさい場合があります";
+
+/* Settings */
+"Temperature Unit" = "温度単位";
+"Launch at Login" = "ログイン時に起動";
+"Notify when fans are loud" = "ファンがうるさい時に通知";
+"Useful for hearing impaired" = "聴覚に問題がある方に便利";
+"Helper" = "ヘルパー";
+"Profiles" = "プロファイル";
+"App version: %@" = "アプリのバージョン: %@";
+"Helper version: %@" = "ヘルパーのバージョン: %@";
+"Update available" = "アップデート利用可能";
+"Install Helper" = "ヘルパーをインストール";
+"Updating Helper..." = "ヘルパーを更新中...";
+"Uninstall Helper" = "ヘルパーをアンインストール";
+"Removing..." = "削除中...";
+
+/* Updates */
+"Check for Updates" = "アップデートを確認";
+"Checking for updates..." = "アップデートを確認中...";
+"Version %@ is available" = "バージョン %@ が利用可能";
+"Vent is up to date" = "Ventは最新です";
+"Could not check for updates" = "アップデートを確認できませんでした";
+"Download URL not available" = "ダウンロードURLが利用できません";
+"Starting download..." = "ダウンロードを開始...";
+"Downloading... %d%%" = "ダウンロード中... %d%%";
+"Download failed: %@" = "ダウンロード失敗: %@";
+"Installing..." = "インストール中...";
+"Install failed: %@" = "インストール失敗: %@";
+"Install and Restart" = "インストールして再起動";
+"Updates" = "アップデート";
+"Automatically check for updates" = "自動的にアップデートを確認";
+"Update helper with app" = "アプリでヘルパーを更新";
+
+/* Onboarding */
+"Welcome to Vent" = "Ventへようこそ";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Ventは温度に応じてMacのファンを制御します。\n凉しい時は静かに、熱い時は強く回ります。";
+"Privileged Helper" = "特権ヘルパー";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Ventはファンを制御するために\n管理者アクセスを持つヘルパーデーモンが必要です。\nパスワードを求められます。";
+"Independent Updates" = "独立したアップデート";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "ヘルパーはアプリとは獨立して更新できます。\n設定で「ヘルパーを更新」をクリックするだけ です。";
+"Loud Fan Alerts" = "うるさいファンアラート";
+"Get a notification when fans are\nrunning at high speed." = "ファンが高速で稼働している時に\n通知を受け取りましょう。";
+"Skip for now — I'll do it later" = "今はスキップ — 後で行います";
+"Installing..." = "インストール中...";
+
+/* Status */
+"Connecting..." = "接続中...";
+"Helper not installed" = "ヘルパーがインストールされていません";
+"Ready" = "準備完了";
+"not installed" = "未インストール";
+
+/* Errors */
+"Error" = "エラー";
+"Error installing helper: %@" = "ヘルパーのインストールエラー: %@";
+"Error uninstalling helper: %@" = "ヘルパーのアンインストールエラー: %@";
+
+/* Fan modes */
+"Auto" = "自動";
+"Auto Temp" = "自動温度";
+"Manual RPM" = "手動RPM";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "摂氏";
+"Fahrenheit" = "華氏";
+
+/* Menu */
+"Quit Vent" = "Ventを終了";
