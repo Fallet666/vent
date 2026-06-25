@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "Temperature";
+"RPM" = "RPM";
+"Mode" = "Mode";
+"Settings" = "Settings";
+"Manage helper and preferences" = "Manage helper and preferences";
+"Rename" = "Rename";
+"Delete" = "Delete";
+"Save" = "Save";
+"Cancel" = "Cancel";
+"OK" = "OK";
+"Next" = "Next";
+"Skip" = "Skip";
+"Profile name" = "Profile name";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "Fans are running at high speed and may be loud.";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "Fans at %d%% — may be loud";
+
+/* Settings */
+"Temperature Unit" = "Temperature Unit";
+"Launch at Login" = "Launch at Login";
+"Notify when fans are loud" = "Notify when fans are loud";
+"Useful for hearing impaired" = "Useful for hearing impaired";
+"Helper" = "Helper";
+"Profiles" = "Profiles";
+"App version: %@" = "App version: %@";
+"Helper version: %@" = "Helper version: %@";
+"Update available" = "Update available";
+"Install Helper" = "Install Helper";
+"Updating Helper..." = "Updating Helper...";
+"Uninstall Helper" = "Uninstall Helper";
+"Removing..." = "Removing...";
+
+/* Updates */
+"Check for Updates" = "Check for Updates";
+"Checking for updates..." = "Checking for updates...";
+"Version %@ is available" = "Version %@ is available";
+"Vent is up to date" = "Vent is up to date";
+"Could not check for updates" = "Could not check for updates";
+"Download URL not available" = "Download URL not available";
+"Starting download..." = "Starting download...";
+"Downloading... %d%%" = "Downloading... %d%%";
+"Download failed: %@" = "Download failed: %@";
+"Installing..." = "Installing...";
+"Install failed: %@" = "Install failed: %@";
+"Install and Restart" = "Install and Restart";
+"Updates" = "Updates";
+"Automatically check for updates" = "Automatically check for updates";
+"Update helper with app" = "Update helper with app";
+
+/* Onboarding */
+"Welcome to Vent" = "Welcome to Vent";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot.";
+"Privileged Helper" = "Privileged Helper";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password.";
+"Independent Updates" = "Independent Updates";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime.";
+"Loud Fan Alerts" = "Loud Fan Alerts";
+"Get a notification when fans are\nrunning at high speed." = "Get a notification when fans are\nrunning at high speed.";
+"Skip for now — I'll do it later" = "Skip for now — I'll do it later";
+"Installing..." = "Installing...";
+
+/* Status */
+"Connecting..." = "Connecting...";
+"Helper not installed" = "Helper not installed";
+"Ready" = "Ready";
+"not installed" = "not installed";
+
+/* Errors */
+"Error" = "Error";
+"Error installing helper: %@" = "Error installing helper: %@";
+"Error uninstalling helper: %@" = "Error uninstalling helper: %@";
+
+/* Fan modes */
+"Auto" = "Auto";
+"Auto Temp" = "Auto Temp";
+"Manual RPM" = "Manual RPM";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "Celsius";
+"Fahrenheit" = "Fahrenheit";
+
+/* Menu */
+"Quit Vent" = "Quit Vent";

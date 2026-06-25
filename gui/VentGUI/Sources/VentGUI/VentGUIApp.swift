@@ -2,8 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-@main
-final class AppDelegate: NSObject, NSApplicationDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let resizePanelNotification = Notification.Name("VentResizePanel")
     private static var sharedDelegate: AppDelegate?
 
@@ -13,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalEventMonitor: Any?
     private let panelWidth: CGFloat = 320
 
-    static func main() {
+    public static func start() {
         let application = NSApplication.shared
         let delegate = AppDelegate()
         sharedDelegate = delegate
@@ -21,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         application.run()
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -76,12 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showPopover()
         return true
     }
 
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         VentDaemonManager.shared.quit()
         return .terminateNow
     }
@@ -282,7 +281,7 @@ final class VentDaemonManager: ObservableObject {
 
     @Published var fans: [FanState] = []
     @Published var daemonOnline = false
-    @Published var statusMessage = "Connecting..."
+    @Published var statusMessage = String(localized: "Connecting...")
     @Published var averageTemperature: Double?
     @Published var controlMode: VentMode = .auto
     @Published var targetTemperature: Double = 0
@@ -333,7 +332,7 @@ final class VentDaemonManager: ObservableObject {
                     self.fans = []
                     self.averageTemperature = nil
                     self.helperVersion = nil
-                    self.statusMessage = "Helper not installed"
+                    self.statusMessage = String(localized: "Helper not installed")
                 }
                 return
             }
@@ -384,8 +383,8 @@ final class VentDaemonManager: ObservableObject {
                     self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
                 }
                 self.daemonOnline = true
-                if self.statusMessage != "Ready" {
-                    self.statusMessage = "Ready"
+                if self.statusMessage != String(localized: "Ready") {
+                    self.statusMessage = String(localized: "Ready")
                 }
                 self.isRefreshing = false
             }
@@ -423,7 +422,7 @@ final class VentDaemonManager: ObservableObject {
         guard !isCheckingForUpdates else { return }
         isCheckingForUpdates = true
         if manual {
-            updateCheckMessage = "Checking for updates..."
+            updateCheckMessage = String(localized: "Checking for updates...")
         }
 
         Task.detached { [latestReleaseAPIURL] in
@@ -446,13 +445,13 @@ final class VentDaemonManager: ObservableObject {
                     self.latestReleaseVersion = release.tagName
                     self.latestReleaseURL = release.htmlURL
                     self.updateCheckMessage = self.appUpdateAvailable ?
-                        "Version \(release.tagName) is available" : "Vent is up to date"
+                        String(format: String(localized: "Version %@ is available"), release.tagName) : String(localized: "Vent is up to date")
                     self.isCheckingForUpdates = false
                 }
             } catch {
                 await MainActor.run {
                     if manual {
-                        self.updateCheckMessage = "Could not check for updates"
+                        self.updateCheckMessage = String(localized: "Could not check for updates")
                     }
                     self.isCheckingForUpdates = false
                 }
@@ -469,7 +468,7 @@ final class VentDaemonManager: ObservableObject {
 
     func downloadAndInstallUpdate() {
         guard let dmgURL = dmgDownloadURL else {
-            updateCheckMessage = "Download URL not available"
+            updateCheckMessage = String(localized: "Download URL not available")
             return
         }
 
@@ -480,14 +479,14 @@ final class VentDaemonManager: ObservableObject {
 
         isDownloadingUpdate = true
         updateDownloadProgress = 0
-        updateCheckMessage = "Starting download..."
+        updateCheckMessage = String(localized: "Starting download...")
         isCheckingForUpdates = false
 
         let downloader = UpdateDownloader()
         updateDownloader = downloader
         downloader.onProgressUpdate = { [weak self] progress in
             self?.updateDownloadProgress = progress
-            self?.updateCheckMessage = "Downloading... \(Int(progress * 100))%"
+            self?.updateCheckMessage = String(format: String(localized: "Downloading... %d%%"), Int(progress * 100))
         }
         downloader.onDownloadComplete = { [weak self] downloadResult in
             self?.updateDownloader = nil
@@ -496,7 +495,7 @@ final class VentDaemonManager: ObservableObject {
                 self?.performInstall(from: fileURL)
             case .failure(let downloadError):
                 self?.isDownloadingUpdate = false
-                self?.updateCheckMessage = "Download failed: \(downloadError.localizedDescription)"
+                self?.updateCheckMessage = String(format: String(localized: "Download failed: %@"), downloadError.localizedDescription)
                 UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
             }
         }
@@ -506,7 +505,7 @@ final class VentDaemonManager: ObservableObject {
     private func performInstall(from dmgURL: URL) {
         isDownloadingUpdate = false
         isInstallingUpdate = true
-        updateCheckMessage = "Installing..."
+        updateCheckMessage = String(localized: "Installing...")
 
         let appPath = Bundle.main.bundlePath
         let mountPoint = "/tmp/fancontrol_mount"
@@ -532,7 +531,7 @@ final class VentDaemonManager: ObservableObject {
             try process.run()
         } catch {
             isInstallingUpdate = false
-            updateCheckMessage = "Install failed: \(error.localizedDescription)"
+            updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
             return
         }
 
@@ -541,39 +540,16 @@ final class VentDaemonManager: ObservableObject {
         }
     }
 
-    private func normalizedReleaseVersion(_ version: String) -> String {
-        let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
-        let versionWithoutPrefix = trimmedVersion.hasPrefix("v") ? String(trimmedVersion.dropFirst()) : trimmedVersion
-        guard let releaseVersion = versionWithoutPrefix.split(separator: "-").first else {
-            return versionWithoutPrefix
-        }
-        return String(releaseVersion)
+    func normalizedReleaseVersion(_ version: String) -> String {
+        VentUtils.normalizedReleaseVersion(version)
     }
 
-    private func compareReleaseVersions(_ leftVersion: String, _ rightVersion: String) -> ComparisonResult {
-        let leftComponents = releaseVersionComponents(leftVersion)
-        let rightComponents = releaseVersionComponents(rightVersion)
-        let componentCount = max(leftComponents.count, rightComponents.count)
-
-        for componentIndex in 0..<componentCount {
-            let leftComponent = componentIndex < leftComponents.count ? leftComponents[componentIndex] : 0
-            let rightComponent = componentIndex < rightComponents.count ? rightComponents[componentIndex] : 0
-            if leftComponent > rightComponent {
-                return .orderedDescending
-            }
-            if leftComponent < rightComponent {
-                return .orderedAscending
-            }
-        }
-        return .orderedSame
+    func compareReleaseVersions(_ leftVersion: String, _ rightVersion: String) -> ComparisonResult {
+        VentUtils.compareReleaseVersions(leftVersion, rightVersion)
     }
 
-    private func releaseVersionComponents(_ version: String) -> [Int] {
-        normalizedReleaseVersion(version)
-            .split(separator: ".")
-            .map { versionPart in
-                Int(versionPart.prefix { $0.isNumber }) ?? 0
-            }
+    func releaseVersionComponents(_ version: String) -> [Int] {
+        VentUtils.releaseVersionComponents(version)
     }
 
     func setControlMode(_ mode: VentMode) {
@@ -738,18 +714,13 @@ final class VentDaemonManager: ObservableObject {
     }
 
     private func hottestTemperature(from temperatures: [VentDaemonTemperature]) -> Double? {
-        let validTemperatures = temperatures
-            .filter { temperature in
-                temperature.value.isFinite &&
-                    temperature.value >= (config?.minUsableTemperature ?? 0) &&
-                    temperature.value < (config?.maxUsableTemperature ?? Double.greatestFiniteMagnitude) &&
-                    !temperature.key.hasPrefix("Ta") &&
-                    !temperature.key.hasPrefix("Tp") &&
-                    !temperature.key.contains("cal")
-            }
-            .map(\.value)
-        guard !validTemperatures.isEmpty else { return nil }
-        return validTemperatures.max()!
+        let minUsable = config?.minUsableTemperature ?? 0
+        let maxUsable = config?.maxUsableTemperature ?? Double.greatestFiniteMagnitude
+        return hottestTemperature(from: temperatures, minUsable: minUsable, maxUsable: maxUsable)
+    }
+
+    func hottestTemperature(from temperatures: [VentDaemonTemperature], minUsable: Double, maxUsable: Double) -> Double? {
+        VentUtils.hottestTemperature(from: temperatures, minUsable: minUsable, maxUsable: maxUsable)
     }
 
     private func smoothedTemperature(_ temperature: Double?) -> Double? {
@@ -930,35 +901,53 @@ enum VentInstaller {
     }
 }
 
-struct FanState: Identifiable, Equatable {
-    var id: Int { index }
-    let index: Int
-    var rpm: Int
-    var currentRPM: Int
-    let minRPM: Int
-    let maxRPM: Int
-    let manualMode: Bool
+public struct FanState: Identifiable, Equatable {
+    public var id: Int { index }
+    public let index: Int
+    public var rpm: Int
+    public var currentRPM: Int
+    public let minRPM: Int
+    public let maxRPM: Int
+    public let manualMode: Bool
 
-    var hasValidRange: Bool {
+    public var hasValidRange: Bool {
         maxRPM > minRPM
     }
 
-    static func == (lhs: FanState, rhs: FanState) -> Bool {
+    public init(index: Int, rpm: Int, currentRPM: Int, minRPM: Int, maxRPM: Int, manualMode: Bool) {
+        self.index = index
+        self.rpm = rpm
+        self.currentRPM = currentRPM
+        self.minRPM = minRPM
+        self.maxRPM = maxRPM
+        self.manualMode = manualMode
+    }
+
+    public static func == (lhs: FanState, rhs: FanState) -> Bool {
         lhs.index == rhs.index && lhs.rpm == rhs.rpm && lhs.currentRPM == rhs.currentRPM &&
         lhs.minRPM == rhs.minRPM && lhs.maxRPM == rhs.maxRPM && lhs.manualMode == rhs.manualMode
     }
 }
 
-struct VentProfile: Codable, Identifiable, Equatable {
-    var id: UUID
-    var name: String
-    var mode: VentMode
-    var targetTemperature: Double
-    var separateFans: Bool
-    var fanRPMs: [Int]
+public struct VentProfile: Codable, Identifiable, Equatable {
+    public var id: UUID
+    public var name: String
+    public var mode: VentMode
+    public var targetTemperature: Double
+    public var separateFans: Bool
+    public var fanRPMs: [Int]
 
-    var isStockProfile: Bool {
+    public var isStockProfile: Bool {
         Self.stockProfileIDs.contains(id)
+    }
+
+    public init(id: UUID, name: String, mode: VentMode, targetTemperature: Double, separateFans: Bool, fanRPMs: [Int]) {
+        self.id = id
+        self.name = name
+        self.mode = mode
+        self.targetTemperature = targetTemperature
+        self.separateFans = separateFans
+        self.fanRPMs = fanRPMs
     }
 
     private static let stockProfileIDs: Set<UUID> = [

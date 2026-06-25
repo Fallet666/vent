@@ -1,5 +1,7 @@
 import SwiftUI
 import ServiceManagement
+import UserNotifications
+import Combine
 
 struct ContentView: View {
     @EnvironmentObject var daemon: VentDaemonManager
@@ -7,6 +9,7 @@ struct ContentView: View {
     @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
+    @AppStorage("loudFanNotificationEnabled") private var loudFanNotificationEnabled = false
     @State private var launchAtLoginError: String?
     @State private var showsSettings = false
     @State private var showsProfileNameInput = false
@@ -14,6 +17,7 @@ struct ContentView: View {
     @State private var profileForRename: VentProfile?
     @State private var showsRenameInput = false
     @State private var renameText = ""
+    @State private var wasFanLoud = false
 
     private var temperatureUnit: TemperatureUnit {
         TemperatureUnit(rawValue: temperatureUnitRaw) ?? .celsius
@@ -37,7 +41,7 @@ struct ContentView: View {
             footerView
         }
         .padding(.horizontal, 12)
-        .padding(.top, 15)
+        .padding(.top, 12)
         .padding(.bottom, 5)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -46,7 +50,14 @@ struct ContentView: View {
                 .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7)
         )
         .compositingGroup()
-        .onAppear { daemon.refresh() }
+        .onAppear {
+            daemon.refresh()
+            requestNotificationPermission()
+            checkLoudFanNotification()
+        }
+        .onReceive(Just(())) { _ in
+            checkLoudFanNotification()
+        }
         .alert("Save Profile", isPresented: $showsProfileNameInput) {
             TextField("Profile name", text: $newProfileName)
             Button("Cancel", role: .cancel) { }
@@ -131,13 +142,39 @@ struct ContentView: View {
         return ratio >= 0.7 ? ratio : nil
     }
 
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    private func checkLoudFanNotification() {
+        guard loudFanNotificationEnabled else { return }
+        let isFanLoud = fansNoiseLevel != nil
+        if isFanLoud && !wasFanLoud {
+            sendLoudFanNotification()
+        }
+        wasFanLoud = isFanLoud
+    }
+
+    private func sendLoudFanNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Vent")
+        content.body = String(localized: "Fans are running at high speed and may be loud.")
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "loudFan",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     private var noiseWarningBanner: some View {
         Group {
             if let level = fansNoiseLevel {
                 HStack(spacing: 4) {
                     Image(systemName: "speaker.wave.3.fill")
                         .font(.caption2)
-                    Text("Fans at \(Int(level * 100))% — may be loud")
+                    Text(String(format: String(localized: "Fans at %d%% — may be loud"), Int(level * 100)))
                         .font(.caption2)
                 }
                 .foregroundColor(.orange)
@@ -260,19 +297,19 @@ struct ContentView: View {
     private var settingsView: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Settings", systemImage: "gearshape")
+                Label(String(localized: "Settings"), systemImage: "gearshape")
                     .font(.headline)
                 Spacer()
-                Text("Manage helper and preferences")
+                Text(String(localized: "Manage helper and preferences"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Temperature Unit")
+                Text(String(localized: "Temperature Unit"))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Picker("Temperature Unit", selection: $temperatureUnitRaw) {
+                Picker(String(localized: "Temperature Unit"), selection: $temperatureUnitRaw) {
                     ForEach(TemperatureUnit.allCases) { unit in
                         Text(unit.title).tag(unit.rawValue)
                     }
@@ -283,7 +320,7 @@ struct ContentView: View {
             .settingsCard()
 
             VStack(alignment: .leading, spacing: 6) {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
+                Toggle(String(localized: "Launch at Login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { newValue in
                         do {
                             if newValue {
@@ -305,19 +342,32 @@ struct ContentView: View {
             }
             .settingsCard()
 
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(String(localized: "Notify when fans are loud"), isOn: $loudFanNotificationEnabled)
+                    .onChange(of: loudFanNotificationEnabled) { newValue in
+                        if newValue {
+                            requestNotificationPermission()
+                        }
+                    }
+                Text(String(localized: "Useful for hearing impaired"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .settingsCard()
+
             VStack(alignment: .leading, spacing: 7) {
-                Text("Helper")
+                Text(String(localized: "Helper"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 helperVersionView
-                Button(daemon.isInstalling ? "Installing..." : installButtonTitle) {
+                Button(daemon.isInstalling ? String(localized: "Installing...") : installButtonTitle) {
                     daemon.installOrUpdateDaemon()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
                 .disabled(daemon.isInstalling || daemon.isUninstalling)
                 if daemon.daemonOnline, daemon.helperVersion != nil {
-                    Button(daemon.isUninstalling ? "Removing..." : "Uninstall Helper") {
+                    Button(daemon.isUninstalling ? String(localized: "Removing...") : String(localized: "Uninstall Helper")) {
                         daemon.confirmAndUninstallDaemon()
                     }
                     .foregroundColor(.red)
@@ -327,7 +377,7 @@ struct ContentView: View {
             .settingsCard()
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("Profiles")
+                Text(String(localized: "Profiles"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 ForEach(daemon.profiles) { profile in
@@ -342,7 +392,7 @@ struct ContentView: View {
                                     .foregroundColor(.accentColor)
                             }
                             if !profile.isStockProfile {
-                                Button("Rename") {
+                                Button(String(localized: "Rename")) {
                                     profileForRename = profile
                                     renameText = profile.name
                                     showsRenameInput = true
@@ -350,7 +400,7 @@ struct ContentView: View {
                                 .buttonStyle(.plain)
                                 .foregroundColor(.secondary)
                                 if daemon.profiles.count > 1 {
-                                    Button("Delete") {
+                                    Button(String(localized: "Delete")) {
                                         withAnimation {
                                             daemon.deleteProfile(profile)
                                         }
@@ -380,10 +430,10 @@ struct ContentView: View {
 
     private var helperVersionView: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("App version: \(daemon.bundledVersion)")
-            Text("Helper version: \(daemon.helperVersion ?? "not installed")")
+            Text(String(format: String(localized: "App version: %@"), daemon.bundledVersion))
+            Text(String(format: String(localized: "Helper version: %@"), daemon.helperVersion ?? "not installed"))
             if daemon.helperNeedsUpdate && daemon.daemonOnline {
-                Text("Update available")
+                Text(String(localized: "Update available"))
                     .foregroundColor(.orange)
             }
         }
@@ -393,11 +443,11 @@ struct ContentView: View {
 
     private var updatesSettingsView: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Updates")
+            Text(String(localized: "Updates"))
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Toggle("Check for updates automatically", isOn: $updateChecksAutomatically)
-            Toggle("Update helper with app", isOn: $updateDaemonWithGUI)
+            Toggle(String(localized: "Automatically check for updates"), isOn: $updateChecksAutomatically)
+            Toggle(String(localized: "Update helper with app"), isOn: $updateDaemonWithGUI)
                 .help("When updating the app, also install the bundled helper daemon at the same time.")
             if let updateCheckMessage = daemon.updateCheckMessage {
                 Text(updateCheckMessage)
@@ -405,7 +455,7 @@ struct ContentView: View {
                     .foregroundColor(daemon.appUpdateAvailable ? .orange : .secondary)
             }
             HStack(spacing: 8) {
-                Button(daemon.isCheckingForUpdates ? "Checking..." : "Check Now") {
+                Button(daemon.isCheckingForUpdates ? String(localized: "Checking for updates...") : String(localized: "Check for Updates")) {
                     daemon.checkForUpdates(manual: true)
                 }
                 .disabled(daemon.isCheckingForUpdates)
@@ -416,11 +466,11 @@ struct ContentView: View {
                             .progressViewStyle(.linear)
                             .frame(maxWidth: 100)
                     } else if daemon.isInstallingUpdate {
-                        Text("Installing...")
+                        Text(String(localized: "Installing..."))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
-                        Button("Install Update") {
+                        Button(String(localized: "Install and Restart")) {
                             daemon.downloadAndInstallUpdate()
                         }
                         .buttonStyle(.borderedProminent)
@@ -443,7 +493,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .help(showsSettings ? "Close settings" : "Settings")
             Spacer()
-            Button("Quit") {
+            Button(String(localized: "Quit Vent")) {
                 daemon.quit()
             }
             .buttonStyle(.plain)
@@ -737,22 +787,22 @@ struct FanSliderShell: View {
     }
 }
 
-enum TemperatureUnit: String, CaseIterable, Identifiable {
+public enum TemperatureUnit: String, CaseIterable, Identifiable {
     case celsius
     case fahrenheit
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .celsius: return "°C"
         case .fahrenheit: return "°F"
         }
     }
 
-    var symbol: String { title }
+    public var symbol: String { title }
 
-    func convert(_ celsius: Double) -> Double {
+    public func convert(_ celsius: Double) -> Double {
         switch self {
         case .celsius:
             return celsius

@@ -1,0 +1,88 @@
+/* General */
+"Temperature" = "Температура";
+"RPM" = "Об/мин";
+"Mode" = "Режим";
+"Settings" = "Настройки";
+"Manage helper and preferences" = "Управление служебной программой и настройками";
+"Rename" = "Переименовать";
+"Delete" = "Удалить";
+"Save" = "Сохранить";
+"Cancel" = "Отмена";
+"OK" = "ОК";
+"Next" = "Далее";
+"Skip" = "Пропустить";
+"Profile name" = "Название профиля";
+
+/* Notifications */
+"Vent" = "Vent";
+"Fans are running at high speed and may be loud." = "Вентиляторы работают на высокой скорости и могут шуметь.";
+
+/* Noise warning */
+"Fans at %d%% — may be loud" = "Вентиляторы на %d%% — могут шуметь";
+
+/* Settings */
+"Temperature Unit" = "Единица температуры";
+"Launch at Login" = "Запускать при входе";
+"Notify when fans are loud" = "Уведомлять о шумных вентиляторах";
+"Useful for hearing impaired" = "Полезно для людей с нарушением слуха";
+"Helper" = "Служебная программа";
+"Profiles" = "Профили";
+"App version: %@" = "Версия приложения: %@";
+"Helper version: %@" = "Версия служебной программы: %@";
+"Update available" = "Доступно обновление";
+"Install Helper" = "Установить служебную программу";
+"Updating Helper..." = "Обновление...";
+"Uninstall Helper" = "Удалить служебную программу";
+"Removing..." = "Удаление...";
+
+/* Updates */
+"Check for Updates" = "Проверить обновления";
+"Checking for updates..." = "Проверка обновлений...";
+"Version %@ is available" = "Версия %@ доступна";
+"Vent is up to date" = "Vent обновлён";
+"Could not check for updates" = "Не удалось проверить обновления";
+"Download URL not available" = "URL для загрузки недоступен";
+"Starting download..." = "Загрузка...";
+"Downloading... %d%%" = "Загрузка... %d%%";
+"Download failed: %@" = "Ошибка загрузки: %@";
+"Installing..." = "Установка...";
+"Install failed: %@" = "Ошибка установки: %@";
+"Install and Restart" = "Установить и перезапустить";
+"Updates" = "Обновления";
+"Automatically check for updates" = "Проверять обновления автоматически";
+"Update helper with app" = "Обновлять служебную программу с приложением";
+
+/* Onboarding */
+"Welcome to Vent" = "Добро пожаловать в Vent";
+"Vent controls your Mac's fans based on\ntemperature — quieter when cool,\nstronger when hot." = "Vent управляет вентиляторами вашего Mac\nна основе температуры — тише когда\nпрохладно, сильнее когда жарко.";
+"Privileged Helper" = "Служебная программа";
+"Vent needs a helper daemon with\nadmin access to control the fans.\nYou'll be asked for your password." = "Vent требуется служебная программа\nс правами администратора для\nуправления вентиляторами. Потребуется\nввести пароль.";
+"Independent Updates" = "Независимые обновления";
+"The helper can be updated separately\nfrom the app — just click\n\"Update Helper\" in Settings anytime." = "Служебная программа обновляется\nотдельно от приложения — нажмите\n\"Обновить служебную программу\"\nв Настройках.";
+"Loud Fan Alerts" = "Уведомления о шуме";
+"Get a notification when fans are\nrunning at high speed." = "Получайте уведомление, когда\nвентиляторы работают на высокой\nскорости.";
+"Skip for now — I'll do it later" = "Пропустить — сделаю позже";
+"Installing..." = "Установка...";
+
+/* Status */
+"Connecting..." = "Подключение...";
+"Helper not installed" = "Служебная программа не установлена";
+"Ready" = "Готово";
+"not installed" = "не установлена";
+
+/* Errors */
+"Error" = "Ошибка";
+"Error installing helper: %@" = "Ошибка установки: %@";
+"Error uninstalling helper: %@" = "Ошибка удаления: %@";
+
+/* Fan modes */
+"Auto" = "Авто";
+"Auto Temp" = "Авто темп";
+"Manual RPM" = "Ручные об/мин";
+
+/* Celsius/Fahrenheit */
+"Celsius" = "Цельсий";
+"Fahrenheit" = "Фаренгейт";
+
+/* Menu */
+"Quit Vent" = "Выйти из Vent";

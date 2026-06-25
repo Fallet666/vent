@@ -1,8 +1,8 @@
 import Darwin
 import Foundation
 
-final class VentDaemonClient {
-    static let shared = VentDaemonClient()
+public final class VentDaemonClient {
+    public static let shared = VentDaemonClient()
     private let sockPath = ProcessInfo.processInfo.environment["VENT_SOCKET_PATH"] ?? "/tmp/ventd.sock"
 
     private init() {}
@@ -70,6 +70,10 @@ final class VentDaemonClient {
 
     func version() -> String? {
         guard let response = sendCommand("VERSION") else { return nil }
+        return Self.parseVersion(response)
+    }
+
+    public static func parseVersion(_ response: String) -> String? {
         let parts = response.split(separator: " ", maxSplits: 1)
         guard parts.count == 2, parts[0] == "VERSION" else { return nil }
         return String(parts[1])
@@ -77,7 +81,10 @@ final class VentDaemonClient {
 
     func fans() -> [VentDaemonFanInfo]? {
         guard let response = sendCommand("FANS") else { return nil }
+        return Self.parseFans(response)
+    }
 
+    public static func parseFans(_ response: String) -> [VentDaemonFanInfo]? {
         let lines = response.split(separator: "\n")
         guard let header = lines.first, header.hasPrefix("FANS") else { return nil }
 
@@ -105,7 +112,10 @@ final class VentDaemonClient {
 
     func temperatures() -> [VentDaemonTemperature]? {
         guard let response = sendCommand("TEMPS") else { return nil }
+        return Self.parseTemperatures(response)
+    }
 
+    public static func parseTemperatures(_ response: String) -> [VentDaemonTemperature]? {
         let lines = response.split(separator: "\n")
         guard let header = lines.first, header.hasPrefix("TEMPS") else { return nil }
 
@@ -118,6 +128,10 @@ final class VentDaemonClient {
 
     func modeStatus() -> VentDaemonModeStatus? {
         guard let response = sendCommand("MODESTATUS") else { return nil }
+        return Self.parseModeStatus(response)
+    }
+
+    public static func parseModeStatus(_ response: String) -> VentDaemonModeStatus? {
         let parts = response.split(separator: " ")
         guard parts.count >= 5,
               parts[0] == "MODE",
@@ -137,6 +151,10 @@ final class VentDaemonClient {
 
     func config() -> VentDaemonConfig? {
         guard let response = sendCommand("CONFIG") else { return nil }
+        return Self.parseConfig(response)
+    }
+
+    public static func parseConfig(_ response: String) -> VentDaemonConfig? {
         let parts = response.split(separator: " ")
         guard parts.count >= 6,
               parts[0] == "CONFIG",
@@ -191,28 +209,42 @@ final class VentDaemonClient {
     }
 }
 
-struct VentDaemonFanInfo {
-    let index: Int
-    let currentRPM: Int
-    let minRPM: Int
-    let maxRPM: Int
-    let targetRPM: Int
-    let manualMode: Bool
+public struct VentDaemonFanInfo {
+    public let index: Int
+    public let currentRPM: Int
+    public let minRPM: Int
+    public let maxRPM: Int
+    public let targetRPM: Int
+    public let manualMode: Bool
+
+    public init(index: Int, currentRPM: Int, minRPM: Int, maxRPM: Int, targetRPM: Int, manualMode: Bool) {
+        self.index = index
+        self.currentRPM = currentRPM
+        self.minRPM = minRPM
+        self.maxRPM = maxRPM
+        self.targetRPM = targetRPM
+        self.manualMode = manualMode
+    }
 }
 
-struct VentDaemonTemperature {
-    let key: String
-    let value: Double
+public struct VentDaemonTemperature {
+    public let key: String
+    public let value: Double
+
+    public init(key: String, value: Double) {
+        self.key = key
+        self.value = value
+    }
 }
 
-enum VentMode: String, CaseIterable, Identifiable, Codable {
+public enum VentMode: String, CaseIterable, Identifiable, Codable {
     case auto
     case manualRPM
     case autoTemp
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    init?(daemonValue: String) {
+    public init?(daemonValue: String) {
         switch daemonValue {
         case "AUTO": self = .auto
         case "MANUAL_RPM": self = .manualRPM
@@ -221,7 +253,7 @@ enum VentMode: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .auto: return "Auto"
         case .manualRPM: return "Manual RPM"
@@ -230,17 +262,32 @@ enum VentMode: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-struct VentDaemonModeStatus {
-    let mode: VentMode
-    let targetTemperature: Double
-    let averageTemperature: Double?
-    let autoRPM: Int?
+public struct VentDaemonModeStatus {
+    public let mode: VentMode
+    public let targetTemperature: Double
+    public let averageTemperature: Double?
+    public let autoRPM: Int?
+
+    public init(mode: VentMode, targetTemperature: Double, averageTemperature: Double?, autoRPM: Int?) {
+        self.mode = mode
+        self.targetTemperature = targetTemperature
+        self.averageTemperature = averageTemperature
+        self.autoRPM = autoRPM
+    }
 }
 
-struct VentDaemonConfig {
-    let minTargetTemperature: Double
-    let maxTargetTemperature: Double
-    let defaultTargetTemperature: Double
-    let minUsableTemperature: Double
-    let maxUsableTemperature: Double
+public struct VentDaemonConfig {
+    public let minTargetTemperature: Double
+    public let maxTargetTemperature: Double
+    public let defaultTargetTemperature: Double
+    public let minUsableTemperature: Double
+    public let maxUsableTemperature: Double
+
+    public init(minTargetTemperature: Double, maxTargetTemperature: Double, defaultTargetTemperature: Double, minUsableTemperature: Double, maxUsableTemperature: Double) {
+        self.minTargetTemperature = minTargetTemperature
+        self.maxTargetTemperature = maxTargetTemperature
+        self.defaultTargetTemperature = defaultTargetTemperature
+        self.minUsableTemperature = minUsableTemperature
+        self.maxUsableTemperature = maxUsableTemperature
+    }
 }

@@ -6,7 +6,7 @@
 
 namespace vent {
 
-constexpr const char* APP_VERSION = "1.2.15";
+constexpr const char* APP_VERSION = "1.3.0";
 constexpr const char* DAEMON_SOCKET_PATH = "/tmp/ventd.sock";
 constexpr const char* DAEMON_PID_PATH = "/tmp/ventd.pid";
 constexpr int WATCHDOG_TIMEOUT_SECONDS = 10;
