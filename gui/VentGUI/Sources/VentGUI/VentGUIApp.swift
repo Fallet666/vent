@@ -1011,7 +1011,7 @@ extension VentDaemonManager {
               let loaded = try? JSONDecoder().decode([VentProfile].self, from: data), !loaded.isEmpty else {
             profiles = Self.stockProfiles
             UserDefaults.standard.set(try? JSONEncoder().encode(profiles), forKey: Self.profilesKey)
-            selectedProfileID = Self.normalProfile.id
+            selectedProfileID = Self.quietProfile.id
             UserDefaults.standard.set(selectedProfileID?.uuidString, forKey: Self.selectedProfileIDKey)
             return
         }
