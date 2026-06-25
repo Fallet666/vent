@@ -785,13 +785,19 @@ enum VentInstaller {
 
         let script = """
         set -e
+        exec > /tmp/vent_install.log 2>&1
+        echo "=== Vent install script started at $(date) ==="
+        echo "ventd source: \(shellQuoted(ventdPath))"
+        echo "ventctl source: \(shellQuoted(ventctlPath))"
         mkdir -p /usr/local/bin
         cp -f \(shellQuoted(ventdPath)) /usr/local/bin/ventd
         cp -f \(shellQuoted(ventctlPath)) /usr/local/bin/ventctl
         chmod 755 /usr/local/bin/ventd /usr/local/bin/ventctl
         chown root:wheel /usr/local/bin/ventd /usr/local/bin/ventctl 2>/dev/null || true
+        echo "Binaries copied"
         launchctl bootout system/com.vent.daemon 2>/dev/null || true
         killall ventd 2>/dev/null || true
+        echo "Old daemon stopped"
         rm -f /tmp/ventd.sock /tmp/ventd.pid
         touch /var/log/ventd.log /var/log/ventd.err
         chmod 644 /var/log/ventd.log /var/log/ventd.err
@@ -820,7 +826,10 @@ enum VentInstaller {
         </plist>
         PLISTEOF
         chmod 644 /Library/LaunchDaemons/com.vent.daemon.plist
-        launchctl bootstrap system /Library/LaunchDaemons/com.vent.daemon.plist 2>/dev/null || launchctl load /Library/LaunchDaemons/com.vent.daemon.plist
+        echo "LaunchDaemon plist created"
+        echo "Attempting launchctl bootstrap..."
+        launchctl bootstrap system /Library/LaunchDaemons/com.vent.daemon.plist && echo "bootstrap succeeded" || echo "bootstrap failed: $?"
+        echo "=== Install script completed ==="
         """
 
         return runPrivilegedScript(script, successMessage: "Helper installed/updated")
