@@ -121,10 +121,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.white.opacity(0.08))
-        }
+        .modifier(CardBackgroundModifier(cornerRadius: 14))
     }
 
     private var fansNoiseLevel: Double? {
@@ -810,18 +807,12 @@ private extension View {
     func modeCard() -> some View {
         padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-            }
+            .modifier(CardBackgroundModifier(cornerRadius: 12))
     }
 
     func settingsCard() -> some View {
         padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-            }
+            .modifier(CardBackgroundModifier(cornerRadius: 12))
     }
 }
