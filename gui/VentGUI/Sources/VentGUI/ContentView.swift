@@ -122,14 +122,8 @@ struct ContentView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background {
-            if #available(macOS 15.0, *) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.white.opacity(0.1))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
-            } else {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.white.opacity(0.08))
-            }
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.white.opacity(0.08))
         }
     }
 
@@ -817,14 +811,8 @@ private extension View {
         padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background {
-                if #available(macOS 15.0, *) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.white.opacity(0.1))
-                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                } else {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                }
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
             }
     }
 
@@ -832,14 +820,8 @@ private extension View {
         padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                if #available(macOS 15.0, *) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.white.opacity(0.1))
-                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                } else {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                }
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
             }
     }
 }
