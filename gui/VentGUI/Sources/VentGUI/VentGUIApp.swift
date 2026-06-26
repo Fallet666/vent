@@ -101,6 +101,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button,
               let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
+        VentDaemonManager.shared.isPanelVisible = true
         VentDaemonManager.shared.refresh()
 
         let panel = panel ?? makePanel()
@@ -126,6 +127,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closePanel() {
         guard let panel else { return }
+        VentDaemonManager.shared.isPanelVisible = false
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -304,6 +306,7 @@ final class VentDaemonManager: ObservableObject {
     @Published var selectedProfileID: UUID?
 
     private var refreshTask: Task<Void, Never>?
+    var isPanelVisible = false
     private var smoothedAverageTemperature: Double?
     private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/vent/releases/latest")!
     private var latestRelease: GitHubRelease?
@@ -695,7 +698,11 @@ final class VentDaemonManager: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                self?.refresh()
+                guard let self, self.isPanelVisible else {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    continue
+                }
+                self.refresh()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
