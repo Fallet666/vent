@@ -122,7 +122,7 @@ struct ContentView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background {
-            if #available(macOS 26, *) {
+            if #available(macOS 15.0, *) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.white.opacity(0.1))
                     .glassEffect(.regular, in: .rect(cornerRadius: 14))
@@ -817,7 +817,7 @@ private extension View {
         padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background {
-                if #available(macOS 26, *) {
+                if #available(macOS 15.0, *) {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(.white.opacity(0.1))
                         .glassEffect(.regular, in: .rect(cornerRadius: 12))
@@ -832,7 +832,7 @@ private extension View {
         padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                if #available(macOS 26, *) {
+                if #available(macOS 15.0, *) {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(.white.opacity(0.1))
                         .glassEffect(.regular, in: .rect(cornerRadius: 12))
