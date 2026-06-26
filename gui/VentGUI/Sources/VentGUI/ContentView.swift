@@ -121,7 +121,16 @@ struct ContentView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .modifier(CardBackgroundModifier(cornerRadius: 14))
+        .background {
+            if #available(macOS 26, *) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.1))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.08))
+            }
+        }
     }
 
     private var fansNoiseLevel: Double? {
@@ -807,12 +816,30 @@ private extension View {
     func modeCard() -> some View {
         padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .modifier(CardBackgroundModifier(cornerRadius: 12))
+            .background {
+                if #available(macOS 26, *) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                }
+            }
     }
 
     func settingsCard() -> some View {
         padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .modifier(CardBackgroundModifier(cornerRadius: 12))
+            .background {
+                if #available(macOS 26, *) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                }
+            }
     }
 }

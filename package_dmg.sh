@@ -3,17 +3,20 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESOURCE_DIR="$PROJECT_DIR/gui/VentGUI/Sources/VentGUI/Resources"
-HEADER_PATH="$PROJECT_DIR/include/daemon_ipc.h"
-DEFAULT_VERSION="$(grep -o 'APP_VERSION = "[^"]*"' "$HEADER_PATH" | cut -d'"' -f2)"
+DEFAULT_VERSION="$(PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
+from pathlib import Path
+import os
+import re
+
+header_path = Path(os.environ['PROJECT_DIR']) / 'include' / 'daemon_ipc.h'
+header_text = header_path.read_text()
+version_match = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', header_text)
+if not version_match:
+    raise SystemExit('APP_VERSION not found')
+print(version_match.group(1))
+PY
+)"
 VERSION="${VERSION:-$DEFAULT_VERSION}"
-
-# Update version in source if VERSION differs
-if [[ "$VERSION" != "$DEFAULT_VERSION" ]]; then
-    echo "Updating version: $DEFAULT_VERSION -> $VERSION"
-    sed -i.bak "s/APP_VERSION = \"[^\"]*\"/APP_VERSION = \"$VERSION\"/" "$HEADER_PATH"
-    rm -f "$HEADER_PATH.bak"
-fi
-
 DIST_DIR="$PROJECT_DIR/dist"
 APP_DIR="$DIST_DIR/Vent.app"
 DMG_STAGING_DIR="$DIST_DIR/dmg"

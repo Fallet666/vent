@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-public final class VentDaemonClient: Sendable {
+public final class VentDaemonClient {
     public static let shared = VentDaemonClient()
     private let sockPath = ProcessInfo.processInfo.environment["VENT_SOCKET_PATH"] ?? "/tmp/ventd.sock"
 
