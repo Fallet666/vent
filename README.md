@@ -1,163 +1,139 @@
-<h1 align="center">Vent</h1>
+<h1 align="center">🌀 Vent</h1>
+<h3 align="center">Choose a temperature.<br>Let Vent handle the fans.</h3>
+<p align="center">Free, open-source Mac fan control. Right in your menu bar.</p>
 
 <p align="center">
-  <em>Lightweight fan control for macOS</em>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Download Vent"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 or later">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT license"></a>
+</p>
+<p align="center">
+  <a href="#install">Get started</a> &nbsp; · &nbsp;
+  <a href="docs/images/README.md">Screenshots</a>
+</p>
+<p align="center">
+  <a href="README.md"><strong>English</strong></a> &nbsp; · &nbsp;
+  <a href="README.ru.md">Русский</a> &nbsp; · &nbsp;
+  <a href="README.de.md">Deutsch</a> &nbsp; · &nbsp;
+  <a href="README.es.md">Español</a> &nbsp; · &nbsp;
+  <a href="README.fr.md">Français</a> &nbsp; · &nbsp;
+  <a href="README.pt-BR.md">Português (Brasil)</a> &nbsp; · &nbsp;
+  <a href="README.zh-CN.md">简体中文</a> &nbsp; · &nbsp;
+  <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
+  <a href="README.ko.md">한국어</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&logo=github" alt="Release"></a>
-  <a href="https://github.com/Fallet666/vent/releases"><img src="https://img.shields.io/github/downloads/Fallet666/vent/total?style=flat-square&logo=github" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/macOS-12+-black?style=flat-square&logo=apple" alt="macOS 12+">
-  <img src="https://img.shields.io/badge/Apple%20Silicon-✓-brightgreen?style=flat-square&logo=apple" alt="Apple Silicon">
-  <img src="https://img.shields.io/badge/Intel-✓-brightgreen?style=flat-square&logo=intel" alt="Intel">
+  <img src="docs/images/temperature-light.png" width="320" alt="Target temperature, light appearance">
+  &nbsp;&nbsp;
+  <img src="docs/images/temperature-dark.png" width="320" alt="Target temperature, dark appearance">
 </p>
 
-<p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest">
-    <img src="https://img.shields.io/badge/⬇_Download_Vent-0066CC?style=for-the-badge" alt="Download">
-  </a>
-  &nbsp;
-  <a href="https://github.com/Fallet666/homebrew-tap">
-    <img src="https://img.shields.io/badge/brew_install_--cask_vent-F5492B?style=for-the-badge&logo=homebrew" alt="brew install --cask vent">
-  </a>
-</p>
+<table>
+  <tr>
+    <td align="center" width="33%"><strong>🌡️ Your temperature</strong><br><br>Pick a target. Vent adjusts the fans.</td>
+    <td align="center" width="33%"><strong>👁️ Visible warnings</strong><br><br>Notice high fan speeds without sound.</td>
+    <td align="center" width="33%"><strong>💚 Every mode is free</strong><br><br>No subscription. No account.</td>
+  </tr>
+</table>
 
----
+## 🌡️ Your temperature. Your choice.
 
-Menu-bar fan control for macOS. Manual RPM, temperature target, or automatic — from a compact popover. No accounts, no telemetry, no Dock icon.
+You shouldn't have to figure out which RPM to use every time your workload changes. Pick a **target temperature** in **Auto Temp**, and Vent adjusts fan speed toward it. Or choose a built-in profile and get back to what you were doing.
 
-Built with Swift + C++17. Works on Apple Silicon and Intel. A privileged helper daemon (`ventd`) handles SMC writes and keeps fan settings running after the app is closed.
+> [!TIP]
+> Temperature control is included. **No paid tier, subscription, or account.** Vent is free software under the MIT license.
 
----
-
-## Features
-
-| | |
+| What you want | What to choose |
 |---|---|
-| **Three modes** | Auto (OS default), Manual RPM, Auto Temp — switch instantly |
-| **Per-fan control** | Adjust all fans in unison or each one independently |
-| **Real SMC ranges** | Sliders use your Mac's actual min/max RPM limits |
-| **Persistent daemon** | Settings survive app quit via a launchd helper |
-| **Profiles** | Quiet, Normal, Gaming, Lap presets — or save your own |
-| **CLI tool** | `ventctl` for scripting and remote control |
-| **Universal** | Apple Silicon + Intel, macOS 12+ |
+| Let macOS manage cooling | **Auto** |
+| Have Vent adjust the fans toward a temperature | **Auto Temp** |
+| Set exact RPM yourself | **Manual RPM**, together or per fan |
+| Switch quickly between saved setups | **Quiet**, **Normal**, **Gaming**, **Lap**, or your own profile |
 
----
+A temperature target is a goal, not a guarantee: the result depends on your Mac, workload, and surroundings. Vent uses available sensor readings; the displayed temperature is not a measurement of the case or your skin.
 
-## Install
+## 👁️ See when the fans may be loud
+
+**You don't have to hear the fans to know they're running hard.** Vent shows a visible warning in its panel when fan speeds are high. This is especially useful for deaf and hard-of-hearing users, and anyone wearing headphones.
+
+<p align="center">
+  <img src="docs/images/noise-dark.png" width="320" alt="Vent shows an orange text warning: Fans at 85% — may be loud">
+</p>
+
+The warning estimates possible noise from RPM: it appears when the highest current fan speed reaches 70% of the highest reported maximum speed. **It does not use a microphone or measure decibels.**
+
+You can also enable **Notify when fans are loud** in Settings and allow macOS notifications. In the current implementation, readings refresh while the Vent panel is visible; don't rely on this option as an always-on background noise alert.
+
+## ✨ Small app, useful controls
+
+- A compact menu-bar panel with light and dark system appearance. No Dock icon.
+- Live temperature and fan speeds, with RPM controls based on reported hardware limits.
+- Built-in profiles, plus save, rename, and delete your own.
+- Celsius or Fahrenheit, launch at login, and configurable update checks.
+- A local helper that continues controlling the fans when the panel or app is closed.
+- `ventctl` for scripts and diagnostics. See the [developer guide](docs/DEVELOPMENT.md).
+
+<a id="install"></a>
+
+## 🚀 Get started
 
 ### Homebrew
 
-```bash
+```sh
 brew tap Fallet666/homebrew-tap
 brew install --cask vent
 ```
 
-### DMG
+### Download
 
-Download from [Releases](https://github.com/Fallet666/vent/releases/latest), drag to Applications, launch, and click **Install Helper** in settings.
+1. Download the DMG from [the latest release](https://github.com/Fallet666/vent/releases/latest).
+2. Drag **Vent** to **Applications** and open it.
+3. Follow setup to install the helper. macOS asks for an administrator password because changing fan speeds requires elevated privileges.
+4. Choose **Auto Temp**, then your target temperature — or pick a profile.
 
-The helper installs into `/Library/LaunchDaemons` and CLI tools into `/usr/local/bin`. macOS will ask for an admin password.
+The current packaging uses ad-hoc signing rather than Developer ID notarization, so macOS may block the downloaded app. Review the source and release before deciding whether to allow it in your macOS security settings.
 
-> The app is ad-hoc signed. If macOS blocks it, right-click → **Open**, or:
-> ```bash
-> xattr -dr com.apple.quarantine /Applications/Vent.app
-> ```
+**Requires macOS 13+ and a Mac with controllable fans.** The project includes Intel and Apple Silicon support, but sensor availability and fan control vary by model. A fanless MacBook Air has no fan to control. Please [report compatibility](https://github.com/Fallet666/vent/issues/new?template=compatibility_report.yml) rather than assuming every model is supported.
 
----
+## ↩️ Returning to macOS control
 
-## Usage
+> [!IMPORTANT]
+> **Closing the panel or quitting Vent does not reset fan settings.** Select **Auto** before quitting if you want macOS to take over.
 
-Click the fan icon in the menu bar.
+The installed `ventd` helper keeps running after the app closes. Settings also offers **Uninstall Helper**, which returns fans to Auto and removes the helper. Delete the app separately if you no longer need it.
 
-- **Auto** — macOS controls fans normally. The safe default.
-- **Manual RPM** — set a fixed speed with sliders. Toggle "Separate fans" for per-fan control.
-- **Auto Temp** — pick a target temperature (°C). The daemon ramps fans to maintain it.
-- **Profiles** — tap a preset (Quiet, Normal, Gaming, Lap) or save your own configuration.
+## 🔒 Privacy
 
-Fan settings persist after the app closes. Switch back to **Auto** or quit Vent to return to macOS defaults.
+No account or analytics. Fan control happens locally through a Unix socket between the app and `ventd`.
 
----
+**Automatic update checks are enabled by default** and contact GitHub for release information. Downloading an update also uses the network. Turn off **Automatically check for updates** in Settings if you don't want automatic checks.
 
-## CLI
+## 💚 Help Vent reach more Macs
 
-`ventctl` is installed alongside the helper:
+<p align="center">
+  <a href="https://github.com/Fallet666/vent"><img src="https://img.shields.io/badge/Star_Vent-F59E0B?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Star Vent on GitHub"></a>
+  <a href="https://github.com/Fallet666/vent/issues/new?template=compatibility_report.yml"><img src="https://img.shields.io/badge/Share_your_Mac-7C3AED?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Send a compatibility report"></a>
+</p>
 
-```bash
-ventctl list              # list fans with RPM ranges
-ventctl temps             # show all temperature sensors
-ventctl daemon status     # check mode, target temp, override map
-ventctl persist-all 2500  # set and persist fan speed
-ventctl unpersist-all     # return to macOS auto control
-ventctl read F0Ac         # read a raw SMC key
-```
+If Vent is useful to you, give the repository a star, share it with someone who needs it, or send a compatibility report. Bug reports, translations, and pull requests help too.
 
----
+When reporting a hardware issue, include your Mac model, macOS version, what you expected, and the output of:
 
-## Build From Source
-
-Requirements: macOS, Xcode CLI Tools, CMake, SwiftPM.
-
-```bash
-# Daemon
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(sysctl -n hw.ncpu)
-ctest --test-dir build --output-on-failure
-
-# GUI
-cd gui/VentGUI
-swift build -c release
-
-# Package DMG
-./package_dmg.sh
-```
-
----
-
-## Architecture
-
-```
-Vent.app (SwiftUI menu-bar app)
-  │
-  ├── VentGUI — popover UI, fan sliders, profiles
-  ├── DaemonClient — AF_UNIX socket IPC to ventd
-  └── NativeSlider — NSSlider wrapper (AppKit)
-          │
-          ▼  /tmp/ventd.sock
-ventd (C++17 daemon, runs as root via launchd)
-  ├── IntelSMCBackend — IOKit SMC reads/writes
-  ├── HID temperature sensors (Apple Silicon)
-  ├── Auto-temp control loop (2s interval)
-  ├── Reconciliation loop (300ms, on-change only)
-  └── Watchdog — reverts to Auto on client disconnect
-
-ventctl (CLI client)
-  └── Same AF_UNIX protocol as the GUI
-```
-
----
-
-## Privacy
-
-No analytics, no telemetry, no accounts, no external network calls. The app communicates only with its local daemon over a Unix socket at `/tmp/ventd.sock`.
-
----
-
-## Contributing
-
-Issues, compatibility reports, and PRs welcome.
-
-When reporting on a new Mac model, use the [compatibility report template](.github/ISSUE_TEMPLATE/compatibility_report.yml) and include output of:
-
-```bash
+```sh
 ventctl list
 ventctl temps
 ventctl daemon status
 ```
 
----
+## 🛠️ Build and contribute
+
+Build instructions, CLI examples, and architecture: [developer guide](docs/DEVELOPMENT.md).
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+[MIT](LICENSE). Use it, inspect it, and make it better.
