@@ -3,11 +3,11 @@
 <p align="center">Бесплатное управление вентиляторами Mac — прямо из строки меню.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Latest release"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 or later">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT license"></a>
 </p>
@@ -26,11 +26,6 @@
   <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
-
-> [!NOTE]
-> Предварительная сборка: изменения ниже доступны в [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). [Стабильная v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) остаётся доступной.
->
-> Homebrew устанавливает стабильную версию; для этой сборки скачайте DMG по ссылке выше.
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="Целевая температура, светлое оформление">
@@ -96,7 +91,7 @@ brew install --cask vent
 
 ### Скачать DMG
 
-1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
+1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/latest).
 2. Перетащите **Vent** в **Applications** и откройте приложение.
 3. Установите помощник по инструкции приложения. macOS запросит пароль администратора: он нужен для изменения оборотов.
 4. Выберите **Auto Temp** и температуру либо готовый профиль.

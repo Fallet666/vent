@@ -3,11 +3,11 @@
 <p align="center">無料・オープンソースの Mac 用ファン制御。メニューバーからすぐ使えます。</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/macOS%20%E7%89%88%E3%82%92%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent をダウンロード"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/macOS%20%E7%89%88%E3%82%92%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent をダウンロード"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="無料かつオープンソース"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="最新リリース"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="最新リリース"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 以降">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT ライセンス"></a>
 </p>
@@ -26,11 +26,6 @@
   <a href="README.ja.md"><strong>日本語</strong></a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
-
-> [!NOTE]
-> プレビュービルド：以下の変更は [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1) に含まれています。安定版 [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) も引き続き利用できます。
->
-> Homebrew では安定版がインストールされます。このプレビューを試すには、上のリンクから DMG をダウンロードしてください。
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="目標温度、ライト外観">
@@ -96,7 +91,7 @@ brew install --cask vent
 
 ### ダウンロード
 
-1. [最新リリース](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1)から DMG をダウンロードします。
+1. [最新リリース](https://github.com/Fallet666/vent/releases/latest)から DMG をダウンロードします。
 2. **Vent** を **Applications** にドラッグして開きます。
 3. セットアップに従ってヘルパーをインストールします。ファン速度の変更には昇格された権限が必要なため、macOS は管理者パスワードを求めます。
 4. **Auto Temp** を選び、目標温度を選択します。あるいはプロファイルを選びます。

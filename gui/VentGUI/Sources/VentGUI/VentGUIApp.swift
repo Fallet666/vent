@@ -69,8 +69,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func performPendingDaemonUpdateIfNeeded() {
-        guard UserDefaults.standard.bool(forKey: VentDaemonManager.pendingDaemonUpdateKey) else { return }
-        UserDefaults.standard.set(false, forKey: VentDaemonManager.pendingDaemonUpdateKey)
+        guard VentDaemonManager.consumePendingHelperUpdate(currentVersion: daemon.bundledVersion) else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.daemon.installOrUpdateDaemon()
@@ -495,17 +494,27 @@ final class VentDaemonManager: ObservableObject {
     }
 
     static let pendingDaemonUpdateKey = "pendingDaemonUpdateAfterGUI"
+    static let pendingDaemonVersionKey = "pendingDaemonUpdateVersion"
+
+    static func consumePendingHelperUpdate(currentVersion: String, defaults: UserDefaults = .standard) -> Bool {
+        let requested = defaults.bool(forKey: pendingDaemonUpdateKey)
+        let expected = defaults.string(forKey: pendingDaemonVersionKey)
+        defaults.removeObject(forKey: pendingDaemonUpdateKey)
+        defaults.removeObject(forKey: pendingDaemonVersionKey)
+        // The legacy boolean supports the first update from older builds.
+        return requested && (expected == nil || expected == currentVersion)
+    }
+
+    private func clearPendingHelperUpdate() {
+        UserDefaults.standard.removeObject(forKey: Self.pendingDaemonUpdateKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingDaemonVersionKey)
+    }
 
     func downloadAndInstallUpdate() {
         guard appUpdateAvailable, !isDownloadingUpdate, !isInstallingUpdate, !isTerminating else { return }
         guard let dmgURL = dmgDownloadURL else {
             updateCheckMessage = String(localized: "Download URL not available")
             return
-        }
-
-        let shouldUpdateDaemon = UserDefaults.standard.bool(forKey: "updateDaemonWithGUI")
-        if shouldUpdateDaemon {
-            UserDefaults.standard.set(true, forKey: Self.pendingDaemonUpdateKey)
         }
 
         isDownloadingUpdate = true
@@ -527,7 +536,7 @@ final class VentDaemonManager: ObservableObject {
             case .failure(let downloadError):
                 self?.isDownloadingUpdate = false
                 self?.updateCheckMessage = String(format: String(localized: "Download failed: %@"), downloadError.localizedDescription)
-                UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
+                self?.clearPendingHelperUpdate()
             }
         }
         downloader.startDownload(from: dmgURL)
@@ -536,51 +545,48 @@ final class VentDaemonManager: ObservableObject {
     private func performInstall(from dmgURL: URL) {
         isDownloadingUpdate = false
         isInstallingUpdate = true
-        prepareForTermination { restored in
-            guard restored else {
-                self.isInstallingUpdate = false
-                self.updateCheckMessage = String(localized: "Could not restore automatic fan control")
-                UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
-                return
-            }
-            self.launchUpdateInstaller(from: dmgURL)
-        }
-    }
-
-    private func launchUpdateInstaller(from dmgURL: URL) {
         updateCheckMessage = String(localized: "Installing...")
-        let appPath = Bundle.main.bundlePath
-        let mountPoint = "/tmp/fancontrol_mount"
-        let scriptPath = "/tmp/fancontrol_update.sh"
-
-        let script = """
-        #!/bin/bash
-        sleep 2
-        /usr/bin/hdiutil attach "\(dmgURL.path)" -mountpoint "\(mountPoint)" -nobrowse -quiet
-        /bin/rm -rf "\(appPath)"
-        /bin/cp -R "\(mountPoint)/Vent.app" "\(appPath)"
-        /usr/bin/hdiutil detach "\(mountPoint)" -quiet -force
-        /bin/rm -f "\(dmgURL.path)" "\(scriptPath)"
-        /usr/bin/open "\(appPath)"
-        """
-
-        do {
-            try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/bash")
-            process.arguments = [scriptPath]
-            try process.run()
-        } catch {
+        guard let tag = latestReleaseVersion else {
             isInstallingUpdate = false
-            cancelTermination()
-            UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
-            updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+            try? FileManager.default.removeItem(at: dmgURL.deletingLastPathComponent())
             return
         }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NSApplication.shared.terminate(nil)
+        let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        let destination = Bundle.main.bundleURL
+        Task {
+            do {
+                let prepared = try await Task.detached {
+                    defer { try? FileManager.default.removeItem(at: dmgURL.deletingLastPathComponent()) }
+                    return try AppUpdateInstaller.prepare(dmg: dmgURL, destination: destination, version: version)
+                }.value
+                prepareForTermination { restored in
+                    guard restored else {
+                        prepared.discard()
+                        self.isInstallingUpdate = false
+                        self.updateCheckMessage = String(localized: "Could not restore automatic fan control")
+                        self.clearPendingHelperUpdate()
+                        return
+                    }
+                    do {
+                        try prepared.launch(waitingFor: ProcessInfo.processInfo.processIdentifier)
+                        if UserDefaults.standard.bool(forKey: "updateDaemonWithGUI") {
+                            UserDefaults.standard.set(true, forKey: Self.pendingDaemonUpdateKey)
+                            UserDefaults.standard.set(version, forKey: Self.pendingDaemonVersionKey)
+                        }
+                        NSApplication.shared.terminate(nil)
+                    } catch {
+                        prepared.discard()
+                        self.isInstallingUpdate = false
+                        self.cancelTermination()
+                        self.clearPendingHelperUpdate()
+                        self.updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+                    }
+                }
+            } catch {
+                isInstallingUpdate = false
+                clearPendingHelperUpdate()
+                updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+            }
         }
     }
 
@@ -883,6 +889,7 @@ final class UpdateDownloader: NSObject, URLSessionDownloadDelegate {
     var onProgressUpdate: ((Double) -> Void)?
     var onDownloadComplete: ((Result<URL, Error>) -> Void)?
     private var session: URLSession?
+    private var completed = false
 
     func startDownload(from downloadURL: URL) {
         let configuration = URLSessionConfiguration.default
@@ -898,20 +905,32 @@ final class UpdateDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        let stableURL = URL(fileURLWithPath: "/tmp/fancontrol_update.dmg")
-        try? FileManager.default.removeItem(at: stableURL)
+        guard let response = downloadTask.response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+            finish(.failure(URLError(.badServerResponse)))
+            return
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("vent-download-\(UUID().uuidString)")
         do {
-            try FileManager.default.moveItem(at: location, to: stableURL)
-            onDownloadComplete?(.success(stableURL))
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            let destination = directory.appendingPathComponent("Vent.dmg")
+            try FileManager.default.moveItem(at: location, to: destination)
+            finish(.success(destination))
         } catch {
-            onDownloadComplete?(.failure(error))
+            try? FileManager.default.removeItem(at: directory)
+            finish(.failure(error))
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let downloadError = error {
-            onDownloadComplete?(.failure(downloadError))
-        }
+        if let error { finish(.failure(error)) }
+    }
+
+    private func finish(_ result: Result<URL, Error>) {
+        guard !completed else { return }
+        completed = true
+        session?.finishTasksAndInvalidate()
+        session = nil
+        onDownloadComplete?(result)
     }
 }
 

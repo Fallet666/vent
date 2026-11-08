@@ -3,9 +3,11 @@
 
 Requires a logged-in macOS GUI session. Never connects to /tmp/ventd.sock.
 """
+import http.server
 import os
 import pathlib
 import plistlib
+import re
 import socketserver
 import subprocess
 import tempfile
@@ -116,6 +118,22 @@ class Handler(socketserver.StreamRequestHandler):
             pass
 
 
+class DownloadFixture(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/artifact.dmg":
+            body = self.server.image.read_bytes()
+            self.send_response(200)
+        else:
+            body = b"not found"
+            self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="vent-test-", dir="/tmp") as temporary:
         directory = pathlib.Path(temporary)
@@ -134,42 +152,68 @@ def main():
             raise RuntimeError(f"macOS SDK directory not found: {sdk}")
         subprocess.run(["xcrun", "swiftc", "-sdk", str(sdk), "-module-cache-path", str(directory / "module-cache"),
                         *map(str, sorted(SOURCE.glob("*.swift"))), str(TEST),
-                        str(TEST.with_name("UpdateIntegration.swift")), "-o", str(executable)], check=True)
+                        str(TEST.with_name("UpdateIntegration.swift")), str(TEST.with_name("InstallerIntegration.swift")),
+                        "-o", str(executable)], check=True)
+        fixture_source = directory / "Fixture.swift"
+        fixture_source.write_text('''import Foundation
+let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
+let channel = UserDefaults.standard.string(forKey: "updateChannel") ?? "missing"
+try (version + "|" + channel).write(to: Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("started"), atomically: true, encoding: .utf8)
+''')
+        fixture = directory / "Fixture"
+        subprocess.run(["xcrun", "swiftc", "-sdk", str(sdk), "-module-cache-path", str(directory / "module-cache"),
+                        str(fixture_source), "-o", str(fixture)], check=True)
+        subprocess.run(["defaults", "write", "dev.vent.installer-fixture", "updateChannel", "-string", "beta"], check=True)
         environment = os.environ.copy()
         environment["VENT_SOCKET_PATH"] = str(socket_path)
-        for scenario in ("updates", "missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
-            helper = None
-            if scenario not in ("missing", "updates"):
-                helper = FakeHelper(str(socket_path), scenario)
-                threading.Thread(target=helper.serve_forever, daemon=True).start()
-            try:
-                started = time.monotonic()
-                subprocess.run([str(executable), scenario], env=environment, timeout=25, check=True)
-                elapsed = time.monotonic() - started
-                if helper:
-                    deadline = time.monotonic() + 1
-                    while not helper.auto_acknowledged and time.monotonic() < deadline:
-                        time.sleep(0.01)
-                    with helper.lock:
-                        commands = list(helper.commands)
-                        acknowledged = helper.auto_acknowledged
-                    assert acknowledged, f"{scenario}: exited without Auto acknowledgement"
-                    writes = [item for item in commands if item.startswith(("MODE ", "SET ", "SETALL "))]
-                    assert writes and writes[-1] == "MODE AUTO", f"{scenario}: final writes {writes}"
-                    if scenario == "ordering":
-                        assert helper.guard_checked, "pending termination guard was not exercised"
-                        assert "SETALL 2500" not in writes, "accepted a fan write after termination began"
-                        assert writes.count("MODE MANUAL") == 1, "accepted mode change during termination"
-                        assert "MODE MANUAL" in writes and any(item.startswith("SETALL ") for item in writes), f"queued writes missing: {writes}"
-                        assert elapsed >= 2, "app exited before delayed Auto acknowledgement"
-                print(f"PASS {scenario} ({elapsed:.1f}s)", flush=True)
-            finally:
-                subprocess.run(["defaults", "delete", "dev.vent.lifecycle-tests"],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-                if helper:
-                    helper.shutdown()
-                    helper.server_close()
-                    socket_path.unlink(missing_ok=True)
+        environment["VENT_TEST_FIXTURE"] = str(fixture)
+        version = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', (ROOT.parents[1] / "include" / "daemon_ipc.h").read_text()).group(1)
+        environment["VENT_TEST_DMG_VERSION"] = version
+        environment["VENT_TEST_DMG"] = str(ROOT.parents[1] / "dist" / f"Vent-{version}.dmg")
+        download_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), DownloadFixture)
+        download_server.image = pathlib.Path(environment["VENT_TEST_DMG"])
+        environment["VENT_TEST_DOWNLOAD_URL"] = f"http://127.0.0.1:{download_server.server_port}"
+        threading.Thread(target=download_server.serve_forever, daemon=True).start()
+        try:
+            for scenario in ("installer", "updates", "missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
+                helper = None
+                if scenario not in ("missing", "updates", "installer"):
+                    helper = FakeHelper(str(socket_path), scenario)
+                    threading.Thread(target=helper.serve_forever, daemon=True).start()
+                try:
+                    started = time.monotonic()
+                    subprocess.run([str(executable), scenario], env=environment, timeout=25, check=True)
+                    elapsed = time.monotonic() - started
+                    if helper:
+                        deadline = time.monotonic() + 1
+                        while not helper.auto_acknowledged and time.monotonic() < deadline:
+                            time.sleep(0.01)
+                        with helper.lock:
+                            commands = list(helper.commands)
+                            acknowledged = helper.auto_acknowledged
+                        assert acknowledged, f"{scenario}: exited without Auto acknowledgement"
+                        writes = [item for item in commands if item.startswith(("MODE ", "SET ", "SETALL "))]
+                        assert writes and writes[-1] == "MODE AUTO", f"{scenario}: final writes {writes}"
+                        if scenario == "ordering":
+                            assert helper.guard_checked, "pending termination guard was not exercised"
+                            assert "SETALL 2500" not in writes, "accepted a fan write after termination began"
+                            assert writes.count("MODE MANUAL") == 1, "accepted mode change during termination"
+                            assert "MODE MANUAL" in writes and any(item.startswith("SETALL ") for item in writes), f"queued writes missing: {writes}"
+                            assert elapsed >= 2, "app exited before delayed Auto acknowledgement"
+                    print(f"PASS {scenario} ({elapsed:.1f}s)", flush=True)
+                finally:
+                    subprocess.run(["defaults", "delete", "dev.vent.lifecycle-tests"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                    if helper:
+                        helper.shutdown()
+                        helper.server_close()
+                        socket_path.unlink(missing_ok=True)
+        finally:
+            download_server.shutdown()
+            download_server.server_close()
+            subprocess.run(["defaults", "delete", "dev.vent.installer-fixture"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
 
 
 if __name__ == "__main__":

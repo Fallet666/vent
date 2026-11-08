@@ -3,11 +3,11 @@
 <p align="center">Kostenlose, quelloffene Lüftersteuerung für den Mac. Direkt in deiner Menüleiste.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/F%C3%BCr%20macOS%20herunterladen-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent herunterladen"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/F%C3%BCr%20macOS%20herunterladen-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent herunterladen"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Kostenlos und quelloffen"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Neueste Version"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Neueste Version"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 oder neuer">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT-Lizenz"></a>
 </p>
@@ -26,11 +26,6 @@
   <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
-
-> [!NOTE]
-> **Vorschau-Build:** Die folgenden Änderungen sind in [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1) enthalten. Die stabile [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) ist weiterhin verfügbar.
->
-> Homebrew installiert die stabile Version; lade zum Testen dieser Vorschau die DMG-Datei über den obigen Link herunter.
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="Zieltemperatur, helles Erscheinungsbild">
@@ -96,7 +91,7 @@ brew install --cask vent
 
 ### Herunterladen
 
-1. Lade das DMG aus [der neuesten Version](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1) herunter.
+1. Lade das DMG aus [der neuesten Version](https://github.com/Fallet666/vent/releases/latest) herunter.
 2. Ziehe **Vent** nach **Applications** und öffne es.
 3. Folge der Einrichtung, um den Helper zu installieren. macOS fragt nach einem Administratorpasswort, weil das Ändern von Lüfterdrehzahlen erhöhte Rechte erfordert.
 4. Wähle **Auto Temp** und dann deine Zieltemperatur – oder ein Profil.

@@ -3,11 +3,11 @@
 <p align="center">Controle de ventiladores para Mac, gratuito e de código aberto. Bem na barra de menus.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/Baixar%20para%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Baixar o Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/Baixar%20para%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Baixar o Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Gratuito e de código aberto"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Versão mais recente"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Versão mais recente"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 ou posterior">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="Licença MIT"></a>
 </p>
@@ -26,11 +26,6 @@
   <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
-
-> [!NOTE]
-> Versão de prévia: as mudanças abaixo estão na [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). A versão estável [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) continua disponível.
->
-> Homebrew instala a versão estável; para testar esta prévia, baixe o DMG pelo link acima.
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="Temperatura alvo, aparência clara">
@@ -96,7 +91,7 @@ brew install --cask vent
 
 ### Baixar
 
-1. Baixe o DMG da [versão mais recente](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
+1. Baixe o DMG da [versão mais recente](https://github.com/Fallet666/vent/releases/latest).
 2. Arraste **Vent** para **Applications** e abra-o.
 3. Siga a configuração para instalar o auxiliar. O macOS pedirá uma senha de administrador porque mudar velocidades de ventiladores exige privilégios elevados.
 4. Escolha **Auto Temp**, depois sua temperatura alvo — ou escolha um perfil.

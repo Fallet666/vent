@@ -155,6 +155,19 @@ struct LifecycleIntegration {
             RunLoop.main.run()
             return
         }
+        if scenario == "installer" {
+            Task { @MainActor in
+                do {
+                    try await InstallerIntegration.run()
+                    exit(0)
+                } catch {
+                    fputs("FAIL installer: \(error)\n", stderr)
+                    exit(1)
+                }
+            }
+            RunLoop.main.run()
+            return
+        }
         fputs("TEST before manager\n", stderr)
         let manager = VentDaemonManager(notifyLoudFans: { completion in
             notifications += 1

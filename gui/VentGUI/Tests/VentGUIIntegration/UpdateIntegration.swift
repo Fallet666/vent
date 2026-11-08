@@ -111,6 +111,39 @@ enum UpdateIntegration {
         check(!next.appUpdateAvailable, "older beta never offered as downgrade from RC")
         next.helperVersion = "1.3.9-beta.1"
         check(next.helperNeedsUpdate, "helper prerelease difference detected")
+        for channel in UpdateChannel.allCases {
+            defaults.set(channel.rawValue, forKey: UpdateChannel.preferenceKey)
+            let promotion = VentDaemonManager(startRefreshLoop: false, fetchRelease: { selected in
+                GitHubRelease.newest(in: [release("v1.3.9-beta.1", prerelease: true), release("v1.3.9")], channel: selected)
+            })
+            promotion.bundledVersion = "1.3.9-beta.1"
+            promotion.checkForUpdates(manual: true)
+            await LifecycleIntegration.waitUntil("stable promotion check finished") { !promotion.isCheckingForUpdates }
+            check(promotion.appUpdateAvailable && promotion.latestReleaseVersion == "v1.3.9", "stable offered to installed beta in both channels")
+            check(UpdateChannel.saved() == channel, "promotion preserves selected channel")
+        }
+        let downloadBase = ProcessInfo.processInfo.environment["VENT_TEST_DOWNLOAD_URL"]!
+        for suffix in ["/artifact.dmg", "/missing.dmg"] {
+            let downloader = UpdateDownloader()
+            var completions = 0
+            var result: Result<URL, Error>?
+            downloader.onDownloadComplete = { received in
+                completions += 1
+                result = received
+            }
+            downloader.startDownload(from: URL(string: downloadBase + suffix)!)
+            await LifecycleIntegration.waitUntil("download completed") { result != nil }
+            switch result! {
+            case .success(let file):
+                check(suffix != "/missing.dmg" && FileManager.default.fileExists(atPath: file.path), "successful download saved")
+                check(file.deletingLastPathComponent().lastPathComponent.hasPrefix("vent-download-"), "download uses private directory")
+                try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+            case .failure:
+                check(suffix == "/missing.dmg", "HTTP error rejected")
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            check(completions == 1, "download callback fires once")
+        }
         print("PASS update service and channel lifecycle")
     }
 }

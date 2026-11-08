@@ -110,6 +110,27 @@ hdiutil create \
     -format UDZO \
     "$DMG_PATH"
 
+# Bind a reusable release artifact to the exact committed product inputs.
+PROJECT_DIR="$PROJECT_DIR" VERSION="$VERSION" DMG_PATH="$DMG_PATH" python3 - <<'PY'
+import hashlib
+import json
+import os
+import subprocess
+from pathlib import Path
+
+root = Path(os.environ['PROJECT_DIR'])
+artifact = Path(os.environ['DMG_PATH'])
+inputs = ['CMakeLists.txt', 'include', 'src', 'gui', 'tests', 'scripts', 'package_dmg.sh', 'release.sh']
+status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal', '--', *inputs], cwd=root)
+manifest = {
+    'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
+    'version': os.environ['VERSION'],
+    'sha256': hashlib.sha256(artifact.read_bytes()).hexdigest(),
+    'dirty': bool(status),
+}
+artifact.with_suffix('.build.json').write_text(json.dumps(manifest, indent=2) + '\n')
+PY
+
 echo ""
 echo "=== Done ==="
 echo "App: $APP_DIR"
