@@ -73,3 +73,11 @@ python3 gui/VentGUI/Tests/VentGUIIntegration/run.py
 ```
 
 The harness compiles the actual GUI sources and runs them against a private fake Unix-socket helper. It tests hidden-panel alerts, disabled monitoring, failed notification retries, connection loss, queued writes and termination acknowledgement/errors/timeouts. It does not change real fan settings or establish delivery of banners by macOS.
+
+It also tests update-channel changes and stale asynchronous responses using an injected release fetcher, and exercises the real URLSession/JSON decoder with URLProtocol fixtures (pagination, HTTP failures and malformed responses).
+
+## Update channels
+
+Settings → Updates offers Stable (default) and Beta. The selection persists across app updates. Stable uses GitHub's designated `/releases/latest`; Beta scans published release pages and selects the highest valid semantic version with a Vent DMG, including stable releases. Drafts and malformed tags are excluded. Switching channels invalidates previous checks and clears their cached offer. It checks immediately only if automatic checks are enabled; manual checks work in either channel. Switching to Stable does not downgrade an installed beta.
+
+Publish beta versions as GitHub prereleases without changing the latest stable release or Homebrew. Do not use `release.sh` for betas: it currently also updates Homebrew and stages unrelated files. See the [GitHub releases API](https://docs.github.com/en/rest/releases/releases) and [SemVer precedence rules](https://semver.org/#spec-item-11).

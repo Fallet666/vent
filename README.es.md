@@ -3,7 +3,7 @@
 <p align="center">Control gratuito y de código abierto de ventiladores para Mac. Justo en la barra de menús.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/Descargar%20para%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Descargar Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/Descargar%20para%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Descargar Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Gratuito y de código abierto"></a>
 </p>
 <p align="center">
@@ -28,7 +28,7 @@
 </p>
 
 > [!NOTE]
-> **Compilación preliminar:** los cambios siguientes están en [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1). La versión estable [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) sigue disponible.
+> **Compilación preliminar:** los cambios siguientes están en [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). La versión estable [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) sigue disponible.
 >
 > Homebrew instala la versión estable; para probar esta versión preliminar, descarga el DMG desde el enlace anterior.
 
@@ -96,7 +96,7 @@ brew install --cask vent
 
 ### Descargar
 
-1. Descarga el DMG de [la última versión](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1).
+1. Descarga el DMG de [la última versión](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
 2. Arrastra **Vent** a **Applications** y ábrelo.
 3. Sigue la configuración para instalar el helper. macOS pide una contraseña de administrador porque cambiar las velocidades de los ventiladores requiere privilegios elevados.
 4. Elige **Auto Temp** y, después, la temperatura objetivo, o selecciona un perfil.

@@ -90,3 +90,9 @@
 "Could not restore automatic fan control" = "Não foi possível restaurar o controle automático das ventoinhas";
 "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "O Vent não conseguiu confirmar que o macOS assumiu o controle das ventoinhas. Verifique o serviço auxiliar e tente sair novamente.";
 "Keep Vent Open" = "Manter o Vent aberto";
+
+/* Update channels */
+"Update channel" = "Canal de atualizações";
+"Stable" = "Estável";
+"Beta" = "Beta";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Beta inclui versões preliminares. O canal estável oferece apenas atualizações estáveis, sem retornar o aplicativo a uma versão anterior.";

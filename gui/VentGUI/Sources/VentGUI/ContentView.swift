@@ -5,6 +5,7 @@ struct ContentView: View {
     @EnvironmentObject var daemon: VentDaemonManager
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
     @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
+    @AppStorage(UpdateChannel.preferenceKey) private var updateChannelRaw = UpdateChannel.stable.rawValue
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
     @AppStorage("loudFanNotificationEnabled") private var loudFanNotificationEnabled = false
@@ -403,6 +404,15 @@ struct ContentView: View {
     private var updatesSettingsView: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(String(localized: "Updates"))
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Picker(String(localized: "Update channel"), selection: $updateChannelRaw) {
+                Text(String(localized: "Stable")).tag(UpdateChannel.stable.rawValue)
+                Text(String(localized: "Beta")).tag(UpdateChannel.beta.rawValue)
+            }
+            .disabled(daemon.isDownloadingUpdate || daemon.isInstallingUpdate)
+            .onChange(of: updateChannelRaw) { _ in daemon.updateChannelChanged() }
+            Text(String(localized: "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app."))
                 .font(.caption)
                 .foregroundColor(.secondary)
             Toggle(String(localized: "Automatically check for updates"), isOn: $updateChecksAutomatically)

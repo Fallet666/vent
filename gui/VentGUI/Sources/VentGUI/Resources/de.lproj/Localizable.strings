@@ -90,3 +90,9 @@
 "Could not restore automatic fan control" = "Automatische Lüftersteuerung konnte nicht wiederhergestellt werden";
 "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent konnte nicht bestätigen, dass macOS die Lüftersteuerung übernommen hat. Überprüfe den Hilfsdienst und versuche erneut, Vent zu beenden.";
 "Keep Vent Open" = "Vent geöffnet lassen";
+
+/* Update channels */
+"Update channel" = "Update-Kanal";
+"Stable" = "Stabil";
+"Beta" = "Beta";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Beta enthält Vorabversionen. Der stabile Kanal bietet nur stabile Updates; die installierte App wird dadurch nicht zurückgestuft.";

@@ -295,7 +295,7 @@ func testReleaseVersionComponents() {
 func testCompareReleaseVersions_equal() {
     expect(VentUtils.compareReleaseVersions("1.2.15", "1.2.15") == .orderedSame, "same versions")
     expect(VentUtils.compareReleaseVersions("v1.2.15", "1.2.15") == .orderedSame, "v prefix same")
-    expect(VentUtils.compareReleaseVersions("1.2.15-beta", "1.2.15") == .orderedSame, "pre-release same")
+    expect(VentUtils.compareReleaseVersions("1.2.15-beta", "1.2.15") == .orderedAscending, "pre-release precedes final")
 }
 
 func testCompareReleaseVersions_greater() {
@@ -314,6 +314,57 @@ func testCompareReleaseVersions_differentCounts() {
     expect(VentUtils.compareReleaseVersions("1.2", "1.2.0") == .orderedSame, "1.2 == 1.2.0")
     expect(VentUtils.compareReleaseVersions("1.2", "1.2.1") == .orderedAscending, "1.2 < 1.2.1")
     expect(VentUtils.compareReleaseVersions("1.2.1", "1.2") == .orderedDescending, "1.2.1 > 1.2")
+}
+
+func testReleasePrecedence() {
+    let versions = ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0"]
+    for (earlier, later) in zip(versions, versions.dropFirst()) {
+        expect(VentUtils.compareReleaseVersions(earlier, later) == .orderedAscending, "\(earlier) precedes \(later)")
+        expect(VentUtils.compareReleaseVersions(later, earlier) == .orderedDescending, "\(later) follows \(earlier)")
+    }
+    expect(VentUtils.compareReleaseVersions("v1.2.3-rc.1+first", "1.2.3-rc.1+second") == .orderedSame, "build metadata ignored")
+    expect(VentUtils.compareReleaseVersions("1.2.3+build.2", "1.2.3+build.10") == .orderedSame, "final build metadata ignored")
+    expect(VentUtils.compareReleaseVersions("1.2.3-rc.99999999999999999999", "1.2.3-rc.100000000000000000000") == .orderedAscending, "large numeric prerelease identifiers")
+}
+
+func releaseFixture(_ tag: String, draft: Bool = false, prerelease: Bool = false, assetURL: String? = "https://github.com/Fallet666/vent/releases/download/v1/Vent.dmg") -> GitHubRelease {
+    let assets: [[String: String]] = assetURL.map { [["name": "Vent.dmg", "browser_download_url": $0, "content_type": "application/octet-stream"]] } ?? []
+    let object: [String: Any] = ["tag_name": tag, "html_url": "https://github.com/Fallet666/vent/releases/tag/v1", "assets": assets, "draft": draft, "prerelease": prerelease]
+    let data = try! JSONSerialization.data(withJSONObject: object)
+    return try! JSONDecoder().decode(GitHubRelease.self, from: data)
+}
+
+func testUpdateReleaseSelection() {
+    let releases = [
+        releaseFixture("v1.4.0-beta.2", prerelease: true),
+        releaseFixture("v1.3.9"),
+        releaseFixture("v9.0.0", draft: true),
+        releaseFixture("v8.0.0", assetURL: nil),
+        releaseFixture("not-a-version"),
+        releaseFixture("v99.0.0", assetURL: "https://example.com/Vent.dmg"),
+        releaseFixture("v1.4.0-beta.11", prerelease: true),
+        releaseFixture("v1.2.0")
+    ]
+    expectEqual(GitHubRelease.newest(in: releases, channel: .stable)?.tagName, "v1.3.9", "stable excludes drafts, prereleases and releases without eligible DMG")
+    expectEqual(GitHubRelease.newest(in: releases, channel: .beta)?.tagName, "v1.4.0-beta.11", "beta selects highest eligible version from unsorted releases")
+    expectEqual(GitHubRelease.newest(in: [releaseFixture("v2.0.0"), releaseFixture("v2.0.0-rc.1", prerelease: true)], channel: .beta)?.tagName, "v2.0.0", "beta channel includes final releases")
+    expectNil(GitHubRelease.newest(in: [releaseFixture("v3.0.0-beta.1")], channel: .stable), "stable rejects prerelease tag even if GitHub flag is false")
+    expectNil(GitHubRelease.newest(in: [releaseFixture("v3.0.0", prerelease: true)], channel: .stable), "stable rejects GitHub prerelease flag")
+    for tag in ["v1.2", "v1.2.03", "v1.2.3-rc.01", "v1.2.3-", "v1.2.3+", "v999999999999999999999999.1.0"] {
+        expect(!releaseFixture(tag).hasValidVersion, "invalid tag rejected: \(tag)")
+    }
+    expect(releaseFixture("v1.2.3-rc.1+build.5").hasValidVersion, "valid semver tag accepted")
+}
+
+func testSavedUpdateChannel() {
+    let suite = "VentGUITests.updateChannel.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    expect(UpdateChannel.saved(in: defaults) == .stable, "missing channel defaults to stable")
+    defaults.set("beta", forKey: UpdateChannel.preferenceKey)
+    expect(UpdateChannel.saved(in: defaults) == .beta, "beta channel persists")
+    defaults.set("unknown", forKey: UpdateChannel.preferenceKey)
+    expect(UpdateChannel.saved(in: defaults) == .stable, "unknown channel falls back to stable")
 }
 
 // ============================================================
@@ -560,6 +611,9 @@ testCompareReleaseVersions_equal()
 testCompareReleaseVersions_greater()
 testCompareReleaseVersions_less()
 testCompareReleaseVersions_differentCounts()
+testReleasePrecedence()
+testUpdateReleaseSelection()
+testSavedUpdateChannel()
 testHottestTemperature_basic()
 testHottestTemperature_empty()
 testHottestTemperature_calibrationExcluded()

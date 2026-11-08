@@ -90,3 +90,9 @@
 "Could not restore automatic fan control" = "Could not restore automatic fan control";
 "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again.";
 "Keep Vent Open" = "Keep Vent Open";
+
+/* Update channels */
+"Update channel" = "Update channel";
+"Stable" = "Stable";
+"Beta" = "Beta";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app.";

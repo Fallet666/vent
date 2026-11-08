@@ -273,30 +273,6 @@ final class VentPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
-private struct GitHubAsset: Decodable {
-    let name: String
-    let browserDownloadURL: URL
-    let contentType: String
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case browserDownloadURL = "browser_download_url"
-        case contentType = "content_type"
-    }
-}
-
-private struct GitHubRelease: Decodable {
-    let tagName: String
-    let htmlURL: URL
-    let assets: [GitHubAsset]
-
-    enum CodingKeys: String, CodingKey {
-        case tagName = "tag_name"
-        case htmlURL = "html_url"
-        case assets
-    }
-}
-
 @MainActor
 final class VentDaemonManager: ObservableObject {
     static let shared = VentDaemonManager()
@@ -345,14 +321,18 @@ final class VentDaemonManager: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     var isPanelVisible = false
     private var smoothedAverageTemperature: Double?
-    private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/vent/releases/latest")!
+    private let fetchRelease: (UpdateChannel) async throws -> GitHubRelease?
+    private var updateCheckTask: Task<Void, Never>?
+    private var updateCheckGeneration = 0
     private var latestRelease: GitHubRelease?
     private var updateDownloader: UpdateDownloader?
 
-    init(startRefreshLoop: Bool = true, notifyLoudFans: @escaping (@escaping (Bool) -> Void) -> Void = { LoudFanNotifier.shared.send(completion: $0) }) {
+    init(startRefreshLoop: Bool = true, fetchRelease: @escaping (UpdateChannel) async throws -> GitHubRelease? = { try await ReleaseChecker.fetch(channel: $0) }, notifyLoudFans: @escaping (@escaping (Bool) -> Void) -> Void = { LoudFanNotifier.shared.send(completion: $0) }) {
         self.notifyLoudFans = notifyLoudFans
+        self.fetchRelease = fetchRelease
         UserDefaults.standard.register(defaults: [
             Self.updateChecksEnabledKey: true,
+            UpdateChannel.preferenceKey: UpdateChannel.stable.rawValue,
             "updateDaemonWithGUI": true
         ])
         if startRefreshLoop { self.startRefreshLoop() }
@@ -442,7 +422,7 @@ final class VentDaemonManager: ObservableObject {
 
     var helperNeedsUpdate: Bool {
         guard let helperVersion else { return !daemonOnline }
-        return normalizedReleaseVersion(helperVersion) != normalizedReleaseVersion(bundledVersion)
+        return compareReleaseVersions(helperVersion, bundledVersion) != .orderedSame
     }
 
     var appUpdateAvailable: Bool {
@@ -451,7 +431,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     var dmgDownloadURL: URL? {
-        latestRelease?.assets.first(where: { $0.contentType == "application/x-apple-diskimage" })?.browserDownloadURL
+        latestRelease?.dmgDownloadURL
     }
 
     func checkForUpdatesIfEnabled() {
@@ -467,43 +447,44 @@ final class VentDaemonManager: ObservableObject {
         return Date().timeIntervalSince(lastCheckDate) >= Self.updateCheckInterval
     }
 
+    func updateChannelChanged() {
+        updateCheckGeneration += 1
+        updateCheckTask?.cancel()
+        isCheckingForUpdates = false
+        latestRelease = nil
+        latestReleaseVersion = nil
+        latestReleaseURL = nil
+        updateCheckMessage = nil
+        UserDefaults.standard.removeObject(forKey: Self.lastUpdateCheckDateKey)
+        checkForUpdatesIfEnabled()
+    }
+
     func checkForUpdates(manual: Bool) {
-        guard !isCheckingForUpdates else { return }
+        guard !isCheckingForUpdates, !isDownloadingUpdate, !isInstallingUpdate, !isTerminating else { return }
+        let channel = UpdateChannel.saved()
+        let generation = updateCheckGeneration
         isCheckingForUpdates = true
         if manual {
             updateCheckMessage = String(localized: "Checking for updates...")
         }
 
-        Task.detached { [latestReleaseAPIURL] in
+        updateCheckTask = Task {
             do {
-                var request = URLRequest(url: latestReleaseAPIURL)
-                request.timeoutInterval = 6
-                request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-                request.setValue("Vent", forHTTPHeaderField: "User-Agent")
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200..<300).contains(httpResponse.statusCode) else {
-                    throw URLError(.badServerResponse)
-                }
-
-                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-                await MainActor.run {
-                    UserDefaults.standard.set(Date(), forKey: Self.lastUpdateCheckDateKey)
-                    self.latestRelease = release
-                    self.latestReleaseVersion = release.tagName
-                    self.latestReleaseURL = release.htmlURL
-                    self.updateCheckMessage = self.appUpdateAvailable ?
-                        String(format: String(localized: "Version %@ is available"), release.tagName) : String(localized: "Vent is up to date")
-                    self.isCheckingForUpdates = false
-                }
+                let release = try await fetchRelease(channel)
+                guard generation == updateCheckGeneration, channel == UpdateChannel.saved() else { return }
+                UserDefaults.standard.set(Date(), forKey: Self.lastUpdateCheckDateKey)
+                latestRelease = release
+                latestReleaseVersion = release?.tagName
+                latestReleaseURL = release?.htmlURL
+                updateCheckMessage = appUpdateAvailable ?
+                    String(format: String(localized: "Version %@ is available"), release!.tagName) : String(localized: "Vent is up to date")
+                isCheckingForUpdates = false
             } catch {
-                await MainActor.run {
-                    if manual {
-                        self.updateCheckMessage = String(localized: "Could not check for updates")
-                    }
-                    self.isCheckingForUpdates = false
+                guard generation == updateCheckGeneration, channel == UpdateChannel.saved() else { return }
+                if manual {
+                    updateCheckMessage = String(localized: "Could not check for updates")
                 }
+                isCheckingForUpdates = false
             }
         }
     }
@@ -516,6 +497,7 @@ final class VentDaemonManager: ObservableObject {
     static let pendingDaemonUpdateKey = "pendingDaemonUpdateAfterGUI"
 
     func downloadAndInstallUpdate() {
+        guard appUpdateAvailable, !isDownloadingUpdate, !isInstallingUpdate, !isTerminating else { return }
         guard let dmgURL = dmgDownloadURL else {
             updateCheckMessage = String(localized: "Download URL not available")
             return

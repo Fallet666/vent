@@ -3,7 +3,7 @@
 <p align="center">Free, open-source Mac fan control. Right in your menu bar.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/Download%20for%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Download Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/Download%20for%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Download Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
 </p>
 <p align="center">
@@ -28,7 +28,7 @@
 </p>
 
 > [!NOTE]
-> Preview build: the changes below are in [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1). [Stable v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) remains available.
+> Preview build: the changes below are in [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). [Stable v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) remains available.
 >
 > Homebrew installs the stable release; use the DMG above to try this preview.
 
@@ -96,7 +96,7 @@ brew install --cask vent
 
 ### Download
 
-1. Download the DMG from [the latest release](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1).
+1. Download the DMG from [the latest release](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
 2. Drag **Vent** to **Applications** and open it.
 3. Follow setup to install the helper. macOS asks for an administrator password because changing fan speeds requires elevated privileges.
 4. Choose **Auto Temp**, then your target temperature — or pick a profile.
@@ -111,6 +111,8 @@ The current packaging uses ad-hoc signing rather than Developer ID notarization,
 > **Quitting Vent returns fans to Auto.** Closing the panel keeps your selected settings running.
 
 Vent waits for the helper to confirm automatic control before exiting. If it cannot confirm the change, it stays open and shows an error. You can also select **Auto** at any time. Settings offers **Uninstall Helper**, which returns fans to Auto and removes the helper. Delete the app separately if you no longer need it.
+
+To receive preview updates, choose **Beta** under **Settings → Updates → Update channel**. The default is **Stable**. Switching back changes future update checks and does not downgrade the installed app.
 
 ## 🔒 Privacy
 

@@ -3,7 +3,7 @@
 <p align="center">Contrôle gratuit et open source des ventilateurs Mac. Directement dans votre barre des menus.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/T%C3%A9l%C3%A9charger%20pour%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Télécharger Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/T%C3%A9l%C3%A9charger%20pour%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Télécharger Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Gratuit et open source"></a>
 </p>
 <p align="center">
@@ -28,7 +28,7 @@
 </p>
 
 > [!NOTE]
-> **Version d’aperçu :** les changements ci-dessous sont inclus dans [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1). La version stable [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) reste disponible.
+> **Version d’aperçu :** les changements ci-dessous sont inclus dans [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). La version stable [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) reste disponible.
 >
 > Homebrew installe la version stable ; pour essayer cet aperçu, téléchargez le DMG via le lien ci-dessus.
 
@@ -96,7 +96,7 @@ brew install --cask vent
 
 ### Télécharger
 
-1. Téléchargez le DMG depuis [la dernière version](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1).
+1. Téléchargez le DMG depuis [la dernière version](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
 2. Faites glisser **Vent** vers **Applications**, puis ouvrez-le.
 3. Suivez la configuration pour installer le helper. macOS demande un mot de passe administrateur, car modifier les vitesses des ventilateurs exige des privilèges élevés.
 4. Choisissez **Auto Temp**, puis votre température cible — ou choisissez un profil.

@@ -3,7 +3,7 @@
 <p align="center">免费、开源的 Mac 风扇控制工具，就在菜单栏中。</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%20macOS%20%E7%89%88-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="下载 Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%20macOS%20%E7%89%88-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="下载 Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="免费且开源"></a>
 </p>
 <p align="center">
@@ -28,7 +28,7 @@
 </p>
 
 > [!NOTE]
-> 预览构建：下文所述更改包含在 [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1) 中。稳定版 [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) 仍可使用。
+> 预览构建：下文所述更改包含在 [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1) 中。稳定版 [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) 仍可使用。
 >
 > Homebrew 安装的是稳定版；如需试用此预览版，请通过上方链接下载 DMG。
 
@@ -96,7 +96,7 @@ brew install --cask vent
 
 ### 下载
 
-1. 从[最新版本](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1)下载 DMG。
+1. 从[最新版本](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1)下载 DMG。
 2. 将 **Vent** 拖到 **Applications** 中并打开。
 3. 按照设置流程安装辅助程序。macOS 会要求输入管理员密码，因为更改风扇转速需要提升权限。
 4. 选择 **Auto Temp**，再选择目标温度；或者选择一个配置文件。

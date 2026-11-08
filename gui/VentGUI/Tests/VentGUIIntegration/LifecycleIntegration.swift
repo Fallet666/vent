@@ -147,6 +147,14 @@ struct LifecycleIntegration {
         defaults.set(false, forKey: VentDaemonManager.updateChecksEnabledKey)
         defaults.set(false, forKey: VentDaemonManager.pendingDaemonUpdateKey)
         defaults.set(scenario == "monitor" || scenario == "retry-notification", forKey: "loudFanNotificationEnabled")
+        if scenario == "updates" {
+            Task { @MainActor in
+                await UpdateIntegration.run()
+                exit(0)
+            }
+            RunLoop.main.run()
+            return
+        }
         fputs("TEST before manager\n", stderr)
         let manager = VentDaemonManager(notifyLoudFans: { completion in
             notifications += 1

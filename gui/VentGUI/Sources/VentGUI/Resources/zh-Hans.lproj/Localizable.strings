@@ -90,3 +90,9 @@
 "Could not restore automatic fan control" = "无法恢复风扇自动控制";
 "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent 无法确认 macOS 已接管风扇控制。请检查辅助服务，然后再次尝试退出。";
 "Keep Vent Open" = "保持 Vent 打开";
+
+/* Update channels */
+"Update channel" = "更新渠道";
+"Stable" = "稳定版";
+"Beta" = "测试版";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "测试版渠道包含预发布版本。切换到稳定版渠道后，仅接收稳定版更新，不会将已安装的应用降级。";

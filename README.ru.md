@@ -3,7 +3,7 @@
 <p align="center">Бесплатное управление вентиляторами Mac — прямо из строки меню.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
 </p>
 <p align="center">
@@ -28,7 +28,7 @@
 </p>
 
 > [!NOTE]
-> Предварительная сборка: изменения ниже доступны в [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1). [Стабильная v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) остаётся доступной.
+> Предварительная сборка: изменения ниже доступны в [v1.3.9-beta.1](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1). [Стабильная v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) остаётся доступной.
 >
 > Homebrew устанавливает стабильную версию; для этой сборки скачайте DMG по ссылке выше.
 
@@ -96,7 +96,7 @@ brew install --cask vent
 
 ### Скачать DMG
 
-1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1).
+1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/tag/v1.3.9-beta.1).
 2. Перетащите **Vent** в **Applications** и откройте приложение.
 3. Установите помощник по инструкции приложения. macOS запросит пароль администратора: он нужен для изменения оборотов.
 4. Выберите **Auto Temp** и температуру либо готовый профиль.
@@ -111,6 +111,8 @@ brew install --cask vent
 > **При выходе из Vent вентиляторы возвращаются в Auto.** Закрытие панели сохраняет выбранные настройки.
 
 Перед выходом Vent дожидается подтверждения автоматического управления от помощника. Если подтвердить возврат в Auto не получилось, приложение остаётся открытым и показывает ошибку. Выбрать **Auto** вручную можно в любой момент. Кнопка **Uninstall Helper** в настройках возвращает Auto и удаляет помощник. Само приложение при необходимости удаляется отдельно.
+
+Для обновления на предварительные версии выберите **Бета** в **Настройки → Обновления → Канал обновлений**. По умолчанию выбран стабильный канал. Возврат к нему меняет будущие проверки обновлений и не откатывает установленную версию.
 
 ## 🔒 Приватность
 

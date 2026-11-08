@@ -133,12 +133,13 @@ def main():
         if not sdk.is_dir():
             raise RuntimeError(f"macOS SDK directory not found: {sdk}")
         subprocess.run(["xcrun", "swiftc", "-sdk", str(sdk), "-module-cache-path", str(directory / "module-cache"),
-                        *map(str, sorted(SOURCE.glob("*.swift"))), str(TEST), "-o", str(executable)], check=True)
+                        *map(str, sorted(SOURCE.glob("*.swift"))), str(TEST),
+                        str(TEST.with_name("UpdateIntegration.swift")), "-o", str(executable)], check=True)
         environment = os.environ.copy()
         environment["VENT_SOCKET_PATH"] = str(socket_path)
-        for scenario in ("missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
+        for scenario in ("updates", "missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
             helper = None
-            if scenario != "missing":
+            if scenario not in ("missing", "updates"):
                 helper = FakeHelper(str(socket_path), scenario)
                 threading.Thread(target=helper.serve_forever, daemon=True).start()
             try:
