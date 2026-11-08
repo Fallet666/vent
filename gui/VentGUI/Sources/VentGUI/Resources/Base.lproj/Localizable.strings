@@ -86,3 +86,7 @@
 
 /* Menu */
 "Quit Vent" = "Quit Vent";
+
+"Could not restore automatic fan control" = "Could not restore automatic fan control";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again.";
+"Keep Vent Open" = "Keep Vent Open";

@@ -11,6 +11,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
     private let panelWidth: CGFloat = 320
+    private let daemon: VentDaemonManager
+    private var awaitingTermination = false
+
+    public override init() {
+        daemon = .shared
+        super.init()
+    }
+
+    init(daemon: VentDaemonManager) {
+        self.daemon = daemon
+        super.init()
+    }
 
     public static func start() {
         let application = NSApplication.shared
@@ -50,8 +62,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenuItem.submenu?.addItem(quitItem)
         NSApplication.shared.mainMenu = mainMenu
 
-        VentDaemonManager.shared.refresh()
-        VentDaemonManager.shared.checkForUpdatesIfEnabled()
+        daemon.refresh()
+        daemon.checkForUpdatesIfEnabled()
 
         performPendingDaemonUpdateIfNeeded()
     }
@@ -61,7 +73,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(false, forKey: VentDaemonManager.pendingDaemonUpdateKey)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            VentDaemonManager.shared.installOrUpdateDaemon()
+            self.daemon.installOrUpdateDaemon()
         }
     }
 
@@ -81,8 +93,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        VentDaemonManager.shared.quit()
-        return .terminateNow
+        guard !awaitingTermination else { return .terminateLater }
+        awaitingTermination = true
+        daemon.prepareForTermination { restored in
+            self.awaitingTermination = false
+            sender.reply(toApplicationShouldTerminate: restored)
+            if !restored {
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Could not restore automatic fan control")
+                alert.informativeText = String(localized: "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again.")
+                alert.addButton(withTitle: String(localized: "Keep Vent Open"))
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
+        return .terminateLater
     }
 
     @objc private func togglePopover() {
@@ -101,8 +126,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button,
               let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
-        VentDaemonManager.shared.isPanelVisible = true
-        VentDaemonManager.shared.refresh()
+        daemon.isPanelVisible = true
+        daemon.refresh()
 
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -127,7 +152,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closePanel() {
         guard let panel else { return }
-        VentDaemonManager.shared.isPanelVisible = false
+        daemon.isPanelVisible = false
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -184,7 +209,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makePanel() -> VentPanel {
         let content = ContentView()
-            .environmentObject(VentDaemonManager.shared)
+            .environmentObject(daemon)
             .environment(\.controlActiveState, .key)
             .frame(width: panelWidth)
         let hostingView = NSHostingView(rootView: content)
@@ -235,7 +260,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        VentDaemonManager.shared.quit()
+        daemon.quit()
     }
 
     private func loadMenuBarImage() -> NSImage? {
@@ -305,6 +330,18 @@ final class VentDaemonManager: ObservableObject {
     @Published var profiles: [VentProfile] = []
     @Published var selectedProfileID: UUID?
 
+    static let loudFanNotificationsEnabledKey = "loudFanNotificationEnabled"
+    private let commandQueue = DispatchQueue(label: "dev.vent.fan-commands")
+    private let notifyLoudFans: (@escaping (Bool) -> Void) -> Void
+    private var loudFanAlertState = LoudFanAlertState()
+    private var requestingNotificationPermission = false
+    private var notificationInFlight = false
+    private var notificationGeneration = 0
+    private var initialConnectionCheckCompleted = false
+    private var hasConnectedToDaemon = false
+    private var terminationCompletions: [(Bool) -> Void] = []
+    private(set) var isTerminating = false
+    private var automaticControlRestoredForTermination = false
     private var refreshTask: Task<Void, Never>?
     var isPanelVisible = false
     private var smoothedAverageTemperature: Double?
@@ -312,26 +349,32 @@ final class VentDaemonManager: ObservableObject {
     private var latestRelease: GitHubRelease?
     private var updateDownloader: UpdateDownloader?
 
-    private init() {
+    init(startRefreshLoop: Bool = true, notifyLoudFans: @escaping (@escaping (Bool) -> Void) -> Void = { LoudFanNotifier.shared.send(completion: $0) }) {
+        self.notifyLoudFans = notifyLoudFans
         UserDefaults.standard.register(defaults: [
             Self.updateChecksEnabledKey: true,
             "updateDaemonWithGUI": true
         ])
-        startRefreshLoop()
+        if startRefreshLoop { self.startRefreshLoop() }
         loadProfiles()
     }
 
     func refresh() {
-        guard !isRefreshing else { return }
+        guard !isRefreshing, !isTerminating else { return }
         isRefreshing = true
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
 
             let online = VentDaemonClient.shared.isRunning()
+            DispatchQueue.main.async {
+                self.initialConnectionCheckCompleted = true
+                if online { self.hasConnectedToDaemon = true }
+            }
             guard online else {
                 DispatchQueue.main.async {
                     self.isRefreshing = false
+                    self.daemonOnline = false
                     self.fans = []
                     self.averageTemperature = nil
                     self.helperVersion = nil
@@ -348,6 +391,8 @@ final class VentDaemonManager: ObservableObject {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
+                guard !self.isTerminating else { self.isRefreshing = false; return }
+                self.hasConnectedToDaemon = true
                 self.helperVersion = version
                 if let daemonConfig {
                     self.config = daemonConfig
@@ -386,6 +431,7 @@ final class VentDaemonManager: ObservableObject {
                     self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
                 }
                 self.daemonOnline = true
+                self.checkLoudFanNotification()
                 if self.statusMessage != String(localized: "Ready") {
                     self.statusMessage = String(localized: "Ready")
                 }
@@ -508,8 +554,19 @@ final class VentDaemonManager: ObservableObject {
     private func performInstall(from dmgURL: URL) {
         isDownloadingUpdate = false
         isInstallingUpdate = true
-        updateCheckMessage = String(localized: "Installing...")
+        prepareForTermination { restored in
+            guard restored else {
+                self.isInstallingUpdate = false
+                self.updateCheckMessage = String(localized: "Could not restore automatic fan control")
+                UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
+                return
+            }
+            self.launchUpdateInstaller(from: dmgURL)
+        }
+    }
 
+    private func launchUpdateInstaller(from dmgURL: URL) {
+        updateCheckMessage = String(localized: "Installing...")
         let appPath = Bundle.main.bundlePath
         let mountPoint = "/tmp/fancontrol_mount"
         let scriptPath = "/tmp/fancontrol_update.sh"
@@ -534,6 +591,8 @@ final class VentDaemonManager: ObservableObject {
             try process.run()
         } catch {
             isInstallingUpdate = false
+            cancelTermination()
+            UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
             updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
             return
         }
@@ -556,12 +615,12 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setControlMode(_ mode: VentMode) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
         controlMode = mode
         let rpm = commonRPM
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
             if mode == .manualRPM {
                 let _ = VentDaemonClient.shared.setAllFans(rpm: rpm)
@@ -576,15 +635,15 @@ final class VentDaemonManager: ObservableObject {
             targetTemperature = temperature
         }
         selectedProfileID = nil
-        guard daemonOnline, controlMode == .autoTemp else { return }
+        guard daemonOnline, !isTerminating, controlMode == .autoTemp else { return }
         let temp = targetTemperature
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
         }
     }
 
     func setFan(index: Int, rpm: Int) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let clampedRPM = clamped(rpm: rpm, for: index)
         let currentMode = controlMode
@@ -593,7 +652,7 @@ final class VentDaemonManager: ObservableObject {
         if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
             fans[fanIndex].rpm = clampedRPM
         }
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             if currentMode != .manualRPM {
                 VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
             }
@@ -606,7 +665,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setAllFans(rpm: Int) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let clampedRPM = clampedForAllFans(rpm: rpm)
         let currentMode = controlMode
@@ -614,7 +673,7 @@ final class VentDaemonManager: ObservableObject {
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
         }
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             if currentMode != .manualRPM {
                 let _ = VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
             }
@@ -623,15 +682,15 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setAutoAll() {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.auto)
         }
     }
 
     func installOrUpdateDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         isInstalling = true
         statusMessage = "Requesting admin permission..."
 
@@ -646,7 +705,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func uninstallDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         isUninstalling = true
         statusMessage = "Requesting admin permission..."
 
@@ -654,6 +713,12 @@ final class VentDaemonManager: ObservableObject {
             let result = VentInstaller.uninstallDaemon()
             await MainActor.run {
                 self.isUninstalling = false
+                if result.success {
+                    self.hasConnectedToDaemon = false
+                    self.daemonOnline = false
+                    self.controlMode = .auto
+                    self.fans = []
+                }
                 self.statusMessage = result.message
                 self.refresh()
             }
@@ -661,7 +726,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func confirmAndUninstallDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         let alert = NSAlert()
         alert.messageText = "Uninstall privileged helper?"
         alert.informativeText = "Vent will switch fans back to Auto, stop the daemon, and remove installed helper binaries. The app itself will stay installed."
@@ -674,8 +739,97 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func quit() {
-        refreshTask?.cancel()
         NSApplication.shared.terminate(nil)
+    }
+
+    // The termination delegate waits for the helper acknowledgement before exit.
+    // All previously accepted fan writes finish before this final Auto command.
+    func prepareForTermination(completion: @escaping (Bool) -> Void) {
+        if automaticControlRestoredForTermination {
+            Self.onTerminationRunLoop { completion(true) }
+            return
+        }
+        if isTerminating {
+            terminationCompletions.append(completion)
+            return
+        }
+        guard !isInstalling, !isUninstalling else {
+            Self.onTerminationRunLoop { completion(false) }
+            return
+        }
+        terminationCompletions = [completion]
+        isTerminating = true
+        refreshTask?.cancel()
+        commandQueue.async {
+            let client = VentDaemonClient.shared
+            let response = client.sendCommand("MODE AUTO")
+            let helperAbsent = response == nil && client.helperIsAbsent()
+            Self.onTerminationRunLoop {
+                // Only a completed, offline first probe can establish "no helper".
+                // A helper seen even once must acknowledge Auto before we exit.
+                let neverConnected = self.initialConnectionCheckCompleted && !self.hasConnectedToDaemon && !self.daemonOnline
+                let restored = response == "OK" || (helperAbsent && neverConnected)
+                self.automaticControlRestoredForTermination = restored
+                if restored {
+                    self.controlMode = .auto
+                } else {
+                    self.cancelTermination()
+                }
+                let completions = self.terminationCompletions
+                self.terminationCompletions.removeAll()
+                completions.forEach { $0(restored) }
+            }
+        }
+    }
+
+    // AppKit may pump a nested run loop inside terminate(_:). A main-queue
+    // callback can deadlock if the caller is already a main-queue task.
+    nonisolated private static func onTerminationRunLoop(_ action: @escaping @MainActor () -> Void) {
+        RunLoop.main.perform(inModes: [.common]) {
+            MainActor.assumeIsolated { action() }
+        }
+        CFRunLoopWakeUp(CFRunLoopGetMain())
+    }
+
+    private func cancelTermination() {
+        isTerminating = false
+        automaticControlRestoredForTermination = false
+        startRefreshLoop()
+    }
+
+    func loudFanNotificationsChanged(enabled: Bool) {
+        notificationGeneration += 1
+        let generation = notificationGeneration
+        loudFanAlertState = LoudFanAlertState()
+        notificationInFlight = false
+        requestingNotificationPermission = enabled
+        guard enabled else { return }
+        LoudFanNotifier.shared.requestAuthorization { [weak self] granted in
+            DispatchQueue.main.async {
+                guard let self, self.notificationGeneration == generation else { return }
+                self.requestingNotificationPermission = false
+                if granted && UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) {
+                    self.refresh()
+                }
+            }
+        }
+    }
+
+    private func checkLoudFanNotification() {
+        guard !requestingNotificationPermission, !notificationInFlight else { return }
+        let enabled = UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey)
+        guard loudFanAlertState.shouldNotify(enabled: enabled, noiseRatio: LoudFanAlertState.noiseRatio(for: fans)) else { return }
+        notificationInFlight = true
+        let generation = notificationGeneration
+        notifyLoudFans { [weak self] accepted in
+            DispatchQueue.main.async {
+                guard let self, self.notificationGeneration == generation else { return }
+                self.notificationInFlight = false
+                // Denied permission or a failed add must not consume the episode.
+                // Re-check on the next sample, including after settings change.
+                if !accepted { self.loudFanAlertState = LoudFanAlertState() }
+            }
+        }
     }
 
     var commonMinRPM: Int {
@@ -698,12 +852,13 @@ final class VentDaemonManager: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self, self.isPanelVisible else {
+                guard let self else { return }
+                guard self.isPanelVisible || UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) else {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     continue
                 }
                 self.refresh()
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                try? await Task.sleep(nanoseconds: self.isPanelVisible ? 1_000_000_000 : 2_000_000_000)
             }
         }
     }
@@ -1056,7 +1211,7 @@ extension VentDaemonManager {
     }
 
     func applyProfile(_ profile: VentProfile) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
 
         selectedProfileID = profile.id
         persistProfiles()
@@ -1067,7 +1222,7 @@ extension VentDaemonManager {
         let rpms = profile.fanRPMs
         let fanCount = fans.count
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             VentDaemonClient.shared.setMode(mode, targetTemperature: temp)
             if mode == .autoTemp {
                 VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)

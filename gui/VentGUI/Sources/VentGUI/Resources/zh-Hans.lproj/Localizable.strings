@@ -86,3 +86,7 @@
 
 /* Menu */
 "Quit Vent" = "退出 Vent";
+
+"Could not restore automatic fan control" = "无法恢复风扇自动控制";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent 无法确认 macOS 已接管风扇控制。请检查辅助服务，然后再次尝试退出。";
+"Keep Vent Open" = "保持 Vent 打开";

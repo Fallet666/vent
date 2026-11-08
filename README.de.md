@@ -3,11 +3,11 @@
 <p align="center">Kostenlose, quelloffene Lüftersteuerung für den Mac. Direkt in deiner Menüleiste.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/F%C3%BCr%20macOS%20herunterladen-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent herunterladen"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/F%C3%BCr%20macOS%20herunterladen-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Vent herunterladen"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Kostenlos und quelloffen"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="Neueste Version"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Neueste Version"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 oder neuer">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT-Lizenz"></a>
 </p>
@@ -26,6 +26,11 @@
   <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
+
+> [!NOTE]
+> **Vorschau-Build:** Die folgenden Änderungen sind in [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1) enthalten. Die stabile [v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) ist weiterhin verfügbar.
+>
+> Homebrew installiert die stabile Version; lade zum Testen dieser Vorschau die DMG-Datei über den obigen Link herunter.
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="Zieltemperatur, helles Erscheinungsbild">
@@ -67,7 +72,7 @@ Eine Zieltemperatur ist ein Ziel, keine Garantie: Das Ergebnis hängt von deinem
 
 Die Warnung schätzt mögliche Geräusche anhand der RPM: Sie erscheint, wenn die höchste aktuelle Lüfterdrehzahl 70 % der höchsten gemeldeten Maximaldrehzahl erreicht. **Sie verwendet kein Mikrofon und misst keine Dezibel.**
 
-Du kannst auch **Notify when fans are loud** in den Settings aktivieren und macOS-Mitteilungen erlauben. In der aktuellen Implementierung werden die Werte aktualisiert, während das Vent-Panel sichtbar ist; verlass dich bei dieser Option nicht auf eine dauerhafte Geräuschwarnung im Hintergrund.
+Du kannst auch **Notify when fans are loud** in den Settings aktivieren und macOS-Mitteilungen erlauben. Solange Vent läuft, funktionieren die Benachrichtigungen auch bei geschlossenem Panel; die Option muss aktiviert sein und macOS-Mitteilungen müssen erlaubt sein.
 
 ## ✨ Kleine App, nützliche Steuerung
 
@@ -75,7 +80,7 @@ Du kannst auch **Notify when fans are loud** in den Settings aktivieren und macO
 - Live-Temperatur und Lüfterdrehzahlen sowie RPM-Steuerung auf Grundlage der gemeldeten Hardwaregrenzen.
 - Integrierte Profile sowie eigene speichern, umbenennen und löschen.
 - Celsius oder Fahrenheit, beim Anmelden starten und konfigurierbare Update-Prüfungen.
-- Ein lokaler Helper, der die Lüfter weiter steuert, wenn das Panel oder die App geschlossen ist.
+- Das Schließen des Panels behält den gewählten Modus bei.
 - `ventctl` für Skripte und Diagnose. Siehe den [Entwicklerleitfaden](docs/DEVELOPMENT.md).
 
 <a id="install"></a>
@@ -91,7 +96,7 @@ brew install --cask vent
 
 ### Herunterladen
 
-1. Lade das DMG aus [der neuesten Version](https://github.com/Fallet666/vent/releases/latest) herunter.
+1. Lade das DMG aus [der neuesten Version](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1) herunter.
 2. Ziehe **Vent** nach **Applications** und öffne es.
 3. Folge der Einrichtung, um den Helper zu installieren. macOS fragt nach einem Administratorpasswort, weil das Ändern von Lüfterdrehzahlen erhöhte Rechte erfordert.
 4. Wähle **Auto Temp** und dann deine Zieltemperatur – oder ein Profil.
@@ -103,9 +108,9 @@ Die aktuelle Paketierung nutzt eine Ad-hoc-Signatur statt einer Developer-ID-Not
 ## ↩️ Zurück zur macOS-Steuerung
 
 > [!IMPORTANT]
-> **Das Schließen des Panels oder Beenden von Vent setzt die Lüftereinstellungen nicht zurück.** Wähle vor dem Beenden **Auto**, wenn macOS wieder übernehmen soll.
+> **Das Schließen des Panels behält die gewählten Einstellungen bei; beim Beenden der App kehrt Vent zu Auto zurück.**
 
-Der installierte Helper `ventd` läuft weiter, nachdem die App geschlossen wurde. In den Settings gibt es auch **Uninstall Helper**; dadurch werden die Lüfter auf Auto zurückgesetzt und der Helper entfernt. Lösche die App separat, wenn du sie nicht mehr brauchst.
+Vor dem Beenden wartet Vent auf die Bestätigung des Helpers, dass Auto aktiv ist. Kann Vent Auto nicht bestätigen, bleibt die App geöffnet und zeigt einen Fehler. In den Settings gibt es auch **Uninstall Helper**; dadurch werden die Lüfter auf Auto zurückgesetzt und der Helper entfernt. Lösche die App separat, wenn du sie nicht mehr brauchst.
 
 ## 🔒 Datenschutz
 

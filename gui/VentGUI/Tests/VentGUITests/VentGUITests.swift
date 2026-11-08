@@ -485,6 +485,48 @@ func testFanState_hasValidRange() {
 }
 
 // ============================================================
+// Loud fan notifications
+// ============================================================
+
+func alertFan(_ current: Int, _ maximum: Int, index: Int = 0) -> FanState {
+    FanState(index: index, rpm: current, currentRPM: current, minRPM: 0, maxRPM: maximum, manualMode: false)
+}
+
+func testLoudFanAlert_noiseRatio() {
+    expectNil(LoudFanAlertState.noiseRatio(for: []), "empty fan snapshot is unknown")
+    let fans = [alertFan(3500, 5000), alertFan(3000, 6000, index: 1)]
+    guard let ratio = LoudFanAlertState.noiseRatio(for: fans) else { fail("valid fans have a ratio") }
+    expectNear(ratio, 3500.0 / 6000.0, 0.000001, "uses maximum current over maximum capacity")
+    expectEqual(LoudFanAlertState.noiseRatio(for: [alertFan(0, 6000)]), 0, "stopped fan is quiet")
+    expectNil(LoudFanAlertState.noiseRatio(for: [alertFan(1000, 0)]), "zero maximum is unknown")
+    expectNil(LoudFanAlertState.noiseRatio(for: [alertFan(1000, -1)]), "negative maximum is unknown")
+    expectNil(LoudFanAlertState.noiseRatio(for: [alertFan(-1, 6000)]), "negative current is unknown")
+    expectNil(LoudFanAlertState.noiseRatio(for: [alertFan(3000, 6000), alertFan(-1, 6000, index: 1)]), "invalid reading invalidates snapshot")
+}
+
+func testLoudFanAlert_thresholdAndHysteresis() {
+    var state = LoudFanAlertState()
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.699), "below threshold is quiet")
+    expect(state.shouldNotify(enabled: true, noiseRatio: 0.7), "threshold alerts")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.9), "sustained loud does not repeat")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.65), "reset boundary stays latched")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.7), "threshold jitter does not repeat")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.649), "quiet reading resets without alert")
+    expect(state.shouldNotify(enabled: true, noiseRatio: 0.7), "loud after quiet alerts again")
+}
+
+func testLoudFanAlert_toggleAndReconnect() {
+    var state = LoudFanAlertState()
+    expect(!state.shouldNotify(enabled: false, noiseRatio: 0.9), "disabled never alerts")
+    expect(state.shouldNotify(enabled: true, noiseRatio: 0.9), "enabling while loud alerts")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: nil), "offline snapshot does not alert")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: LoudFanAlertState.noiseRatio(for: [])), "empty snapshot does not reset latch")
+    expect(!state.shouldNotify(enabled: true, noiseRatio: 0.9), "reconnect while loud does not repeat")
+    expect(!state.shouldNotify(enabled: false, noiseRatio: nil), "disabling clears latch even offline")
+    expect(state.shouldNotify(enabled: true, noiseRatio: 0.9), "re-enabling while loud alerts again")
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -532,6 +574,9 @@ testVentProfile_customUUIDsNotStock()
 testFanState_customEquatable()
 testFanState_idIsIndex()
 testFanState_hasValidRange()
+testLoudFanAlert_noiseRatio()
+testLoudFanAlert_thresholdAndHysteresis()
+testLoudFanAlert_toggleAndReconnect()
 
 print("tests: OK (\(testsPassed)/\(testsRun) assertions passed)")
 }

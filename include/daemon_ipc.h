@@ -6,7 +6,7 @@
 
 namespace vent {
 
-constexpr const char* APP_VERSION = "1.3.7";
+constexpr const char* APP_VERSION = "1.3.8-rc.1";
 constexpr const char* DAEMON_SOCKET_PATH = "/tmp/ventd.sock";
 constexpr const char* DAEMON_PID_PATH = "/tmp/ventd.pid";
 constexpr int RECONCILIATION_INTERVAL_MS = 300;

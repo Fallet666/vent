@@ -3,11 +3,11 @@
 <p align="center">Бесплатное управление вентиляторами Mac — прямо из строки меню.</p>
 
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1"><img src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C%20%D0%B4%D0%BB%D1%8F%20macOS-2563EB?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="Скачать Vent"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="Latest release"></a>
+  <a href="https://github.com/Fallet666/vent/releases/tag/v1.3.7"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 or later">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT license"></a>
 </p>
@@ -26,6 +26,11 @@
   <a href="README.ja.md">日本語</a> &nbsp; · &nbsp;
   <a href="README.ko.md">한국어</a>
 </p>
+
+> [!NOTE]
+> Предварительная сборка: изменения ниже доступны в [v1.3.8-rc.1](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1). [Стабильная v1.3.7](https://github.com/Fallet666/vent/releases/tag/v1.3.7) остаётся доступной.
+>
+> Homebrew устанавливает стабильную версию; для этой сборки скачайте DMG по ссылке выше.
 
 <p align="center">
   <img src="docs/images/temperature-light.png" width="320" alt="Целевая температура, светлое оформление">
@@ -67,7 +72,7 @@
 
 Vent оценивает возможный шум по оборотам: предупреждение появляется, когда наибольшие текущие обороты достигают 70% от наибольшего сообщённого максимума. **Микрофон не используется, децибелы не измеряются.**
 
-В настройках есть отдельная опция **Notify when fans are loud**. Для системных уведомлений нужно разрешение macOS. Сейчас показания обновляются, пока панель Vent видна, поэтому эту опцию нельзя считать постоянным фоновым оповещением.
+Включите **Notify when fans are loud** в настройках и разрешите уведомления macOS. Vent проверяет обороты, пока приложение запущено, в том числе при закрытой панели. В одном периоде высоких оборотов приходит одно уведомление; небольшой запас у порога защищает от повторных оповещений.
 
 ## ✨ Всё под рукой
 
@@ -75,7 +80,7 @@ Vent оценивает возможный шум по оборотам: пре�
 - Текущая температура и обороты; диапазоны регулировки берутся из данных оборудования.
 - Готовые профили и сохранение собственных настроек.
 - Градусы Цельсия и Фаренгейта, запуск при входе, настройка проверки обновлений.
-- Фоновый помощник: управление продолжается после закрытия панели и выхода из приложения.
+- Закрытие панели сохраняет выбранный режим; выход из Vent возвращает управление macOS.
 - `ventctl` для скриптов и диагностики — примеры в [руководстве разработчика](docs/DEVELOPMENT.md).
 
 <a id="install"></a>
@@ -91,7 +96,7 @@ brew install --cask vent
 
 ### Скачать DMG
 
-1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/latest).
+1. Скачайте DMG из [последнего релиза](https://github.com/Fallet666/vent/releases/tag/v1.3.8-rc.1).
 2. Перетащите **Vent** в **Applications** и откройте приложение.
 3. Установите помощник по инструкции приложения. macOS запросит пароль администратора: он нужен для изменения оборотов.
 4. Выберите **Auto Temp** и температуру либо готовый профиль.
@@ -103,9 +108,9 @@ brew install --cask vent
 ## ↩️ Как вернуть управление macOS
 
 > [!IMPORTANT]
-> **Закрытие панели и выход из Vent не сбрасывают настройки.** Чтобы вернуть управление macOS, выберите **Auto** перед выходом.
+> **При выходе из Vent вентиляторы возвращаются в Auto.** Закрытие панели сохраняет выбранные настройки.
 
-Помощник `ventd` продолжает работать после закрытия приложения. Кнопка **Uninstall Helper** в настройках возвращает Auto и удаляет помощник. Само приложение при необходимости удаляется отдельно.
+Перед выходом Vent дожидается подтверждения автоматического управления от помощника. Если подтвердить возврат в Auto не получилось, приложение остаётся открытым и показывает ошибку. Выбрать **Auto** вручную можно в любой момент. Кнопка **Uninstall Helper** в настройках возвращает Auto и удаляет помощник. Само приложение при необходимости удаляется отдельно.
 
 ## 🔒 Приватность
 

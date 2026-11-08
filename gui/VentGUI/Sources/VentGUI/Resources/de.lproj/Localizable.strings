@@ -86,3 +86,7 @@
 
 /* Menu */
 "Quit Vent" = "Vent beenden";
+
+"Could not restore automatic fan control" = "Automatische Lüftersteuerung konnte nicht wiederhergestellt werden";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent konnte nicht bestätigen, dass macOS die Lüftersteuerung übernommen hat. Überprüfe den Hilfsdienst und versuche erneut, Vent zu beenden.";
+"Keep Vent Open" = "Vent geöffnet lassen";

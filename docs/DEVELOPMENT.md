@@ -17,7 +17,7 @@ ctest --test-dir build --output-on-failure
 ./package_dmg.sh
 ```
 
-Packaging creates a local ad-hoc-signed app and DMG in `dist/`. It does not notarize or publish a release, or install a helper.
+Packaging builds universal arm64/x86_64 binaries and creates a local ad-hoc-signed app and DMG in `dist/`. It does not notarize or publish a release, or install a helper.
 
 ## CLI
 
@@ -48,7 +48,7 @@ Vent.app — SwiftUI panel in the menu bar
 ventctl — CLI using the same local protocol
 ```
 
-Closing the app does not stop the helper or return fan control to macOS. Select Auto explicitly. Update checks and downloads use GitHub separately from the local fan-control protocol.
+Closing the panel preserves the selected mode. Quitting the app waits for the helper to acknowledge Auto; an error keeps the app open. The launchd helper itself remains installed. Update checks and downloads use GitHub separately from the local fan-control protocol.
 
 ## Documentation images
 
@@ -60,6 +60,16 @@ On macOS 14.4+ with a current SDK:
 
 Set `SDKROOT` to select a particular installed macOS SDK if your default toolchain cannot build the SwiftUI sources.
 
-The script compiles the actual GUI view sources with a separate capture entry point, briefly shows sample windows, and saves light/dark PNGs in `docs/images/`. ScreenCaptureKit captures only this process’s own windows so the glass and material layers remain visible; it does not request access to other apps or the desktop. Values are deterministic sample readings, not measurements or cooling benchmarks. It never launches the app delegate or helper. The capture manager blocks refresh, uses an isolated nonexistent socket path, and disables notification permission requests in a disposable source copy. No fan-control commands are sent.
+The script compiles the actual GUI view sources with a separate capture entry point, briefly shows sample windows, and saves light/dark PNGs in `docs/images/`. ScreenCaptureKit captures only this process’s own windows so the glass and material layers remain visible; it does not request access to other apps or the desktop. Values are deterministic sample readings, not measurements or cooling benchmarks. It never launches the app delegate or helper. The capture manager blocks refresh, uses an isolated nonexistent socket path, and runs with loud-fan notifications disabled. No fan-control commands are sent.
 
 The images show system light/dark appearance, not additional custom themes. They are rendered with the local macOS SDK and can differ from older systems. Re-run after visible UI changes.
+
+## Lifecycle regression checks
+
+Run from the repository root in a logged-in macOS GUI session:
+
+```sh
+python3 gui/VentGUI/Tests/VentGUIIntegration/run.py
+```
+
+The harness compiles the actual GUI sources and runs them against a private fake Unix-socket helper. It tests hidden-panel alerts, disabled monitoring, failed notification retries, connection loss, queued writes and termination acknowledgement/errors/timeouts. It does not change real fan settings or establish delivery of banners by macOS.

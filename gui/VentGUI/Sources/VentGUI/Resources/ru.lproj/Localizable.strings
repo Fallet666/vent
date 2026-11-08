@@ -86,3 +86,7 @@
 
 /* Menu */
 "Quit Vent" = "Выйти из Vent";
+
+"Could not restore automatic fan control" = "Не удалось восстановить автоматическое управление вентиляторами";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent не смог подтвердить, что macOS снова управляет вентиляторами. Проверьте вспомогательную службу и попробуйте выйти ещё раз.";
+"Keep Vent Open" = "Оставить Vent открытым";
