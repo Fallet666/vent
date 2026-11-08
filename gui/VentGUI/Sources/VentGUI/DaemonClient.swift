@@ -64,6 +64,20 @@ public final class VentDaemonClient {
         return String(cString: buffer).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // A failed IPC probe is not proof that a helper is absent: it may be hung.
+    func helperIsAbsent() -> Bool {
+        func isMissing(_ path: String) -> Bool {
+            var info = stat()
+            return lstat(path, &info) != 0 && errno == ENOENT
+        }
+        guard isMissing(sockPath) else { return false }
+        if sockPath == "/tmp/ventd.sock" {
+            return isMissing("/Library/LaunchDaemons/com.vent.daemon.plist") &&
+                isMissing("/usr/local/bin/ventd")
+        }
+        return true
+    }
+
     func isRunning() -> Bool {
         sendCommand("HEARTBEAT")?.hasPrefix("OK") == true
     }

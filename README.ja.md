@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="無料かつオープンソース"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="最新リリース"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="最新リリース"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 以降">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT ライセンス"></a>
 </p>
@@ -67,7 +67,7 @@
 
 警告は RPM から騒音の可能性を推定します。現在の最も高いファン速度が、報告された最高速度の 70% に達すると表示されます。**マイクは使用せず、デシベルも測定しません。**
 
-Settings で **Notify when fans are loud** を有効にし、macOS 通知を許可することもできます。現在の実装では、Vent のパネルが表示されている間にのみ値が更新されます。このオプションを常時動作するバックグラウンドの騒音アラートとしては利用しないでください。
+Settings で **Notify when fans are loud** を有効にし、macOS 通知を許可することもできます。Vent アプリが実行中なら、パネルを閉じていても値は更新されます。
 
 ## ✨ 小さなアプリ、便利な操作
 
@@ -75,7 +75,7 @@ Settings で **Notify when fans are loud** を有効にし、macOS 通知を許�
 - リアルタイムの温度とファン速度、および報告されたハードウェア上限に基づく RPM 制御。
 - 内蔵プロファイルに加え、独自プロファイルの保存、名前変更、削除。
 - 摂氏／華氏、ログイン時起動、設定可能な更新チェック。
-- パネルまたはアプリを閉じてもファン制御を続けるローカルヘルパー。
+- パネルを閉じても選択したモードを維持するローカルヘルパー。アプリを終了すると、ファンは macOS の Auto 制御に戻ります。
 - スクリプトと診断用の `ventctl`。 [開発者ガイド](docs/DEVELOPMENT.md)を参照してください。
 
 <a id="install"></a>
@@ -103,9 +103,9 @@ brew install --cask vent
 ## ↩️ macOS の制御に戻す
 
 > [!IMPORTANT]
-> **パネルを閉じたり Vent を終了したりしても、ファン設定はリセットされません。**macOS に引き継がせたい場合は、終了前に **Auto** を選択してください。
+> **パネルを閉じても選択したファンモードは維持されます。Vent を終了すると、ファンは macOS の Auto 制御に戻ります。**
 
-インストール済みの `ventd` ヘルパーはアプリを閉じた後も動作し続けます。Settings には **Uninstall Helper** もあり、ファンを Auto に戻してヘルパーを削除します。アプリが不要になった場合は、別途削除してください。
+アプリは終了前に `ventd` ヘルパーから Auto の確認応答を待ちます。確認できない場合、Vent は開いたままとなりエラーを表示します。Settings には **Uninstall Helper** もあり、ファンを Auto に戻してヘルパーを削除します。アプリが不要になった場合は、別途削除してください。
 
 ## 🔒 プライバシー
 

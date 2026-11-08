@@ -86,3 +86,13 @@
 
 /* Menu */
 "Quit Vent" = "Ventを終了";
+
+"Could not restore automatic fan control" = "ファンの自動制御を復元できませんでした";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "macOS がファンの制御を引き継いだことを Vent で確認できませんでした。ヘルパーを確認してから、もう一度終了してください。";
+"Keep Vent Open" = "Vent を開いたままにする";
+
+/* Update channels */
+"Update channel" = "更新チャンネル";
+"Stable" = "安定版";
+"Beta" = "ベータ版";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "ベータ版には先行リリースが含まれます。安定版に切り替えると安定版の更新のみを受け取りますが、アプリはダウングレードされません。";

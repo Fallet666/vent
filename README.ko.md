@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="무료 및 오픈 소스"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="최신 릴리스"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="최신 릴리스"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 이상">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT 라이선스"></a>
 </p>
@@ -67,7 +67,7 @@
 
 이 경고는 RPM으로 가능한 소음을 추정합니다. 현재 가장 높은 팬 속도가 보고된 최고 속도의 70%에 도달하면 나타납니다. **마이크를 사용하거나 데시벨을 측정하지 않습니다.**
 
-Settings에서 **Notify when fans are loud**를 활성화하고 macOS 알림을 허용할 수도 있습니다. 현재 구현에서는 Vent 패널이 보이는 동안에만 값이 새로 고쳐집니다. 이 옵션을 항상 켜져 있는 백그라운드 소음 알림으로 신뢰하지 마세요.
+Settings에서 **Notify when fans are loud**를 활성화하고 macOS 알림을 허용할 수도 있습니다. Vent 앱이 실행 중인 동안에는 패널이 닫혀 있어도 값이 새로 고쳐집니다.
 
 ## ✨ 작은 앱, 유용한 제어
 
@@ -75,7 +75,7 @@ Settings에서 **Notify when fans are loud**를 활성화하고 macOS 알림을 
 - 실시간 온도와 팬 속도, 그리고 보고된 하드웨어 한도에 기반한 RPM 제어.
 - 내장 프로필과 함께, 나만의 프로필 저장, 이름 변경, 삭제.
 - 섭씨 또는 화씨, 로그인 시 실행, 구성 가능한 업데이트 확인.
-- 패널이나 앱을 닫아도 팬 제어를 계속하는 로컬 헬퍼.
+- 패널을 닫아도 선택한 모드를 유지하는 로컬 헬퍼. 앱을 종료하면 팬은 macOS의 Auto 제어로 돌아갑니다.
 - 스크립트 및 진단용 `ventctl`. [개발자 가이드](docs/DEVELOPMENT.md)를 참조하세요.
 
 <a id="install"></a>
@@ -103,9 +103,9 @@ brew install --cask vent
 ## ↩️ macOS 제어로 돌아가기
 
 > [!IMPORTANT]
-> **패널을 닫거나 Vent를 종료해도 팬 설정은 재설정되지 않습니다.** macOS가 제어하도록 하려면 종료하기 전에 **Auto**를 선택하세요.
+> **패널을 닫아도 선택한 팬 모드는 유지됩니다. Vent를 종료하면 팬은 macOS의 Auto 제어로 돌아갑니다.**
 
-설치된 `ventd` 헬퍼는 앱을 닫은 뒤에도 계속 실행됩니다. Settings에는 팬을 Auto로 되돌리고 헬퍼를 제거하는 **Uninstall Helper**도 있습니다. 더 이상 필요하지 않다면 앱은 별도로 삭제하세요.
+앱은 종료하기 전에 `ventd` 헬퍼가 Auto를 확인했다는 응답을 기다립니다. 확인할 수 없으면 Vent는 열린 상태로 남아 오류를 표시합니다. Settings에는 팬을 Auto로 되돌리고 헬퍼를 제거하는 **Uninstall Helper**도 있습니다. 더 이상 필요하지 않다면 앱은 별도로 삭제하세요.
 
 ## 🔒 개인정보 보호
 

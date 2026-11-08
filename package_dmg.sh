@@ -23,7 +23,7 @@ DMG_STAGING_DIR="$DIST_DIR/dmg"
 DMG_PATH="$DIST_DIR/Vent-$VERSION.dmg"
 
 echo "=== Building C++ binaries ==="
-cmake -S "$PROJECT_DIR" -B "$PROJECT_DIR/build" -DBUILD_TESTING=ON
+cmake -S "$PROJECT_DIR" -B "$PROJECT_DIR/build" -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 cmake --build "$PROJECT_DIR/build" --parallel
 
 echo ""
@@ -33,7 +33,11 @@ ctest --test-dir "$PROJECT_DIR/build" --output-on-failure
 echo ""
 echo "=== Building GUI app ==="
 cd "$PROJECT_DIR/gui/VentGUI"
-swift build -c release
+swift build -c release --arch arm64 --scratch-path "$PROJECT_DIR/build/gui-arm64"
+ARM_BIN_DIR="$(swift build -c release --arch arm64 --scratch-path "$PROJECT_DIR/build/gui-arm64" --show-bin-path)"
+swift build -c release --arch x86_64 --scratch-path "$PROJECT_DIR/build/gui-x86_64"
+INTEL_BIN_DIR="$(swift build -c release --arch x86_64 --scratch-path "$PROJECT_DIR/build/gui-x86_64" --show-bin-path)"
+/usr/bin/lipo -create "$ARM_BIN_DIR/VentGUI" "$INTEL_BIN_DIR/VentGUI" -output "$PROJECT_DIR/build/VentGUI"
 cd "$PROJECT_DIR"
 
 echo ""
@@ -51,6 +55,10 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <string>VentGUI</string>
     <key>CFBundleIdentifier</key>
     <string>dev.borninvoid.macfancontrol</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
     <key>CFBundleName</key>
     <string>Vent</string>
     <key>CFBundleDisplayName</key>
@@ -71,7 +79,9 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-cp "$PROJECT_DIR/gui/VentGUI/.build/release/VentGUI" "$APP_DIR/Contents/MacOS/VentGUI"
+cp "$PROJECT_DIR/build/VentGUI" "$APP_DIR/Contents/MacOS/VentGUI"
+# SwiftUI Text and String(localized:) use the main app bundle at runtime.
+cp -R "$RESOURCE_DIR"/*.lproj "$APP_DIR/Contents/Resources/"
 cp "$RESOURCE_DIR/VentApp.icns" "$APP_DIR/Contents/Resources/VentApp.icns"
 cp "$RESOURCE_DIR/VentMenuBarTemplate.png" "$APP_DIR/Contents/Resources/VentMenuBarTemplate.png"
 cp "$RESOURCE_DIR/VentMenuBarTemplate@2x.png" "$APP_DIR/Contents/Resources/VentMenuBarTemplate@2x.png"
@@ -99,6 +109,27 @@ hdiutil create \
     -ov \
     -format UDZO \
     "$DMG_PATH"
+
+# Bind a reusable release artifact to the exact committed product inputs.
+PROJECT_DIR="$PROJECT_DIR" VERSION="$VERSION" DMG_PATH="$DMG_PATH" python3 - <<'PY'
+import hashlib
+import json
+import os
+import subprocess
+from pathlib import Path
+
+root = Path(os.environ['PROJECT_DIR'])
+artifact = Path(os.environ['DMG_PATH'])
+inputs = ['CMakeLists.txt', 'include', 'src', 'gui', 'tests', 'scripts', 'package_dmg.sh', 'release.sh']
+status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal', '--', *inputs], cwd=root)
+manifest = {
+    'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
+    'version': os.environ['VERSION'],
+    'sha256': hashlib.sha256(artifact.read_bytes()).hexdigest(),
+    'dirty': bool(status),
+}
+artifact.with_suffix('.build.json').write_text(json.dumps(manifest, indent=2) + '\n')
+PY
 
 echo ""
 echo "=== Done ==="

@@ -86,3 +86,13 @@
 
 /* Menu */
 "Quit Vent" = "Salir de Vent";
+
+"Could not restore automatic fan control" = "No se pudo restaurar el control automático de los ventiladores";
+"Vent could not confirm that macOS took over fan control. Check the helper and try quitting again." = "Vent no pudo confirmar que macOS haya asumido el control de los ventiladores. Comprueba el servicio auxiliar e intenta salir de nuevo.";
+"Keep Vent Open" = "Mantener Vent abierto";
+
+/* Update channels */
+"Update channel" = "Canal de actualizaciones";
+"Stable" = "Estable";
+"Beta" = "Beta";
+"Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Beta incluye versiones preliminares. El canal estable solo ofrece actualizaciones estables; no cambia la app a una versión anterior.";

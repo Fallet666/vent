@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Free and open source"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="Latest release"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 or later">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT license"></a>
 </p>
@@ -67,7 +67,7 @@ A temperature target is a goal, not a guarantee: the result depends on your Mac,
 
 The warning estimates possible noise from RPM: it appears when the highest current fan speed reaches 70% of the highest reported maximum speed. **It does not use a microphone or measure decibels.**
 
-You can also enable **Notify when fans are loud** in Settings and allow macOS notifications. In the current implementation, readings refresh while the Vent panel is visible; don't rely on this option as an always-on background noise alert.
+Enable **Notify when fans are loud** in Settings and allow macOS notifications. Vent checks fan speeds while the app is running, including when its panel is closed. It sends one notification per loud episode, with a small margin to avoid repeated alerts near the threshold.
 
 ## ✨ Small app, useful controls
 
@@ -75,7 +75,7 @@ You can also enable **Notify when fans are loud** in Settings and allow macOS no
 - Live temperature and fan speeds, with RPM controls based on reported hardware limits.
 - Built-in profiles, plus save, rename, and delete your own.
 - Celsius or Fahrenheit, launch at login, and configurable update checks.
-- A local helper that continues controlling the fans when the panel or app is closed.
+- Closing the panel keeps your chosen mode running; quitting Vent returns control to macOS.
 - `ventctl` for scripts and diagnostics. See the [developer guide](docs/DEVELOPMENT.md).
 
 <a id="install"></a>
@@ -103,9 +103,11 @@ The current packaging uses ad-hoc signing rather than Developer ID notarization,
 ## ↩️ Returning to macOS control
 
 > [!IMPORTANT]
-> **Closing the panel or quitting Vent does not reset fan settings.** Select **Auto** before quitting if you want macOS to take over.
+> **Quitting Vent returns fans to Auto.** Closing the panel keeps your selected settings running.
 
-The installed `ventd` helper keeps running after the app closes. Settings also offers **Uninstall Helper**, which returns fans to Auto and removes the helper. Delete the app separately if you no longer need it.
+Vent waits for the helper to confirm automatic control before exiting. If it cannot confirm the change, it stays open and shows an error. You can also select **Auto** at any time. Settings offers **Uninstall Helper**, which returns fans to Auto and removes the helper. Delete the app separately if you no longer need it.
+
+To receive preview updates, choose **Beta** under **Settings → Updates → Update channel**. The default is **Stable**. Switching back changes future update checks and does not downgrade the installed app.
 
 ## 🔒 Privacy
 

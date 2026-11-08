@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="免费且开源"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="最新版本"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="最新版本"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 或更高版本">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="MIT 许可证"></a>
 </p>
@@ -67,7 +67,7 @@
 
 该警告根据 RPM 估计可能的噪声：当前最高风扇转速达到报告的最高转速的 70% 时就会显示。**它不使用麦克风，也不测量分贝。**
 
-你还可以在 Settings 中启用 **Notify when fans are loud**，并允许 macOS 发送通知。当前实现中，读数仅在 Vent 面板可见时刷新；不要将此选项作为始终在后台运行的噪声警报。
+你还可以在 Settings 中启用 **Notify when fans are loud**，并允许 macOS 发送通知。Vent 应用正在运行时，即使面板关闭，读数也会刷新。
 
 ## ✨ 小巧应用，实用控制
 
@@ -75,7 +75,7 @@
 - 实时温度和风扇转速，并基于报告的硬件限制提供 RPM 控制。
 - 内置配置文件，也可保存、重命名和删除自己的配置文件。
 - 摄氏度或华氏度、登录时启动，以及可配置的更新检查。
-- 面板或应用关闭后仍会继续控制风扇的本地辅助程序。
+- 关闭面板后仍会保留所选模式的本地辅助程序；退出应用后，风扇会恢复由 macOS 的 Auto 控制。
 - 用于脚本和诊断的 `ventctl`。参阅[开发者指南](docs/DEVELOPMENT.md)。
 
 <a id="install"></a>
@@ -103,9 +103,9 @@ brew install --cask vent
 ## ↩️ 恢复由 macOS 控制
 
 > [!IMPORTANT]
-> **关闭面板或退出 Vent 不会重置风扇设置。**如果想让 macOS 接管，请在退出前选择 **Auto**。
+> **关闭面板会保留所选风扇模式；退出 Vent 会让风扇恢复由 macOS 的 Auto 控制。**
 
-安装的 `ventd` 辅助程序会在应用关闭后继续运行。Settings 还提供 **Uninstall Helper**，它会让风扇恢复为 Auto 并移除辅助程序。如果不再需要应用，请另行删除它。
+退出前，应用会等待 `ventd` 辅助程序确认 Auto；如果无法确认，Vent 会保持打开并显示错误。Settings 还提供 **Uninstall Helper**，它会让风扇恢复为 Auto 并移除辅助程序。如果不再需要应用，请另行删除它。
 
 ## 🔒 隐私
 

@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/Free_%26_Open_Source-0D9488?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="Gratuit et open source"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=release" alt="Dernière version"></a>
+  <a href="https://github.com/Fallet666/vent/releases/latest"><img src="https://img.shields.io/github/v/release/Fallet666/vent?style=flat-square&amp;color=7C3AED&amp;label=stable" alt="Dernière version"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B?style=flat-square" alt="macOS 13 ou version ultérieure">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0D9488?style=flat-square" alt="Licence MIT"></a>
 </p>
@@ -67,7 +67,7 @@ Une température cible est un objectif, pas une garantie : le résultat dépend 
 
 L’avertissement estime le bruit possible à partir des RPM : il apparaît lorsque la vitesse actuelle du ventilateur le plus rapide atteint 70 % de la vitesse maximale la plus élevée signalée. **Il n’utilise pas de microphone et ne mesure pas les décibels.**
 
-Vous pouvez aussi activer **Notify when fans are loud** dans Settings et autoriser les notifications macOS. Dans l’implémentation actuelle, les relevés se mettent à jour lorsque le panneau Vent est visible ; ne vous fiez pas à cette option comme à une alerte sonore permanente en arrière-plan.
+Vous pouvez aussi activer **Notify when fans are loud** dans Settings et autoriser les notifications macOS. Tant que Vent est en cours d’exécution, les notifications fonctionnent aussi lorsque le panneau est fermé ; l’option doit être activée et les notifications macOS autorisées.
 
 ## ✨ Petite app, commandes utiles
 
@@ -75,7 +75,7 @@ Vous pouvez aussi activer **Notify when fans are loud** dans Settings et autoris
 - Température et vitesses des ventilateurs en direct, avec des commandes RPM fondées sur les limites matérielles signalées.
 - Profils intégrés, avec possibilité d’enregistrer, renommer et supprimer les vôtres.
 - Celsius ou Fahrenheit, lancement à l’ouverture de session et vérifications de mise à jour configurables.
-- Un helper local qui continue de contrôler les ventilateurs lorsque le panneau ou l’app est fermé.
+- Fermer le panneau conserve le mode sélectionné.
 - `ventctl` pour les scripts et le diagnostic. Consultez le [guide du développeur](docs/DEVELOPMENT.md).
 
 <a id="install"></a>
@@ -103,9 +103,9 @@ Le packaging actuel utilise une signature ad hoc plutôt qu’une notarisation D
 ## ↩️ Revenir au contrôle de macOS
 
 > [!IMPORTANT]
-> **Fermer le panneau ou quitter Vent ne réinitialise pas les réglages des ventilateurs.** Sélectionnez **Auto** avant de quitter si vous voulez que macOS reprenne la main.
+> **Fermer le panneau conserve les réglages choisis ; quitter l’app rétablit Auto.**
 
-Le helper `ventd` installé continue de fonctionner après la fermeture de l’app. Settings propose aussi **Uninstall Helper**, qui remet les ventilateurs sur Auto et supprime le helper. Supprimez l’app séparément si vous n’en avez plus besoin.
+Avant de quitter, Vent attend la confirmation du helper qu’Auto est actif. S’il ne peut pas confirmer Auto, l’app reste ouverte et affiche une erreur. Settings propose aussi **Uninstall Helper**, qui remet les ventilateurs sur Auto et supprime le helper. Supprimez l’app séparément si vous n’en avez plus besoin.
 
 ## 🔒 Confidentialité
 

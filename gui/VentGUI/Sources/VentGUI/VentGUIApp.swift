@@ -11,6 +11,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
     private let panelWidth: CGFloat = 320
+    private let daemon: VentDaemonManager
+    private var awaitingTermination = false
+
+    public override init() {
+        daemon = .shared
+        super.init()
+    }
+
+    init(daemon: VentDaemonManager) {
+        self.daemon = daemon
+        super.init()
+    }
 
     public static func start() {
         let application = NSApplication.shared
@@ -50,18 +62,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenuItem.submenu?.addItem(quitItem)
         NSApplication.shared.mainMenu = mainMenu
 
-        VentDaemonManager.shared.refresh()
-        VentDaemonManager.shared.checkForUpdatesIfEnabled()
+        daemon.refresh()
+        daemon.checkForUpdatesIfEnabled()
 
         performPendingDaemonUpdateIfNeeded()
     }
 
     private func performPendingDaemonUpdateIfNeeded() {
-        guard UserDefaults.standard.bool(forKey: VentDaemonManager.pendingDaemonUpdateKey) else { return }
-        UserDefaults.standard.set(false, forKey: VentDaemonManager.pendingDaemonUpdateKey)
+        guard VentDaemonManager.consumePendingHelperUpdate(currentVersion: daemon.bundledVersion) else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            VentDaemonManager.shared.installOrUpdateDaemon()
+            self.daemon.installOrUpdateDaemon()
         }
     }
 
@@ -81,8 +92,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        VentDaemonManager.shared.quit()
-        return .terminateNow
+        guard !awaitingTermination else { return .terminateLater }
+        awaitingTermination = true
+        daemon.prepareForTermination { restored in
+            self.awaitingTermination = false
+            sender.reply(toApplicationShouldTerminate: restored)
+            if !restored {
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Could not restore automatic fan control")
+                alert.informativeText = String(localized: "Vent could not confirm that macOS took over fan control. Check the helper and try quitting again.")
+                alert.addButton(withTitle: String(localized: "Keep Vent Open"))
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
+        return .terminateLater
     }
 
     @objc private func togglePopover() {
@@ -101,8 +125,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button,
               let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
-        VentDaemonManager.shared.isPanelVisible = true
-        VentDaemonManager.shared.refresh()
+        daemon.isPanelVisible = true
+        daemon.refresh()
 
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -127,7 +151,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closePanel() {
         guard let panel else { return }
-        VentDaemonManager.shared.isPanelVisible = false
+        daemon.isPanelVisible = false
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -184,7 +208,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makePanel() -> VentPanel {
         let content = ContentView()
-            .environmentObject(VentDaemonManager.shared)
+            .environmentObject(daemon)
             .environment(\.controlActiveState, .key)
             .frame(width: panelWidth)
         let hostingView = NSHostingView(rootView: content)
@@ -235,7 +259,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        VentDaemonManager.shared.quit()
+        daemon.quit()
     }
 
     private func loadMenuBarImage() -> NSImage? {
@@ -246,30 +270,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 final class VentPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
-}
-
-private struct GitHubAsset: Decodable {
-    let name: String
-    let browserDownloadURL: URL
-    let contentType: String
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case browserDownloadURL = "browser_download_url"
-        case contentType = "content_type"
-    }
-}
-
-private struct GitHubRelease: Decodable {
-    let tagName: String
-    let htmlURL: URL
-    let assets: [GitHubAsset]
-
-    enum CodingKeys: String, CodingKey {
-        case tagName = "tag_name"
-        case htmlURL = "html_url"
-        case assets
-    }
 }
 
 @MainActor
@@ -305,33 +305,55 @@ final class VentDaemonManager: ObservableObject {
     @Published var profiles: [VentProfile] = []
     @Published var selectedProfileID: UUID?
 
+    static let loudFanNotificationsEnabledKey = "loudFanNotificationEnabled"
+    private let commandQueue = DispatchQueue(label: "dev.vent.fan-commands")
+    private let notifyLoudFans: (@escaping (Bool) -> Void) -> Void
+    private var loudFanAlertState = LoudFanAlertState()
+    private var requestingNotificationPermission = false
+    private var notificationInFlight = false
+    private var notificationGeneration = 0
+    private var initialConnectionCheckCompleted = false
+    private var hasConnectedToDaemon = false
+    private var terminationCompletions: [(Bool) -> Void] = []
+    private(set) var isTerminating = false
+    private var automaticControlRestoredForTermination = false
     private var refreshTask: Task<Void, Never>?
     var isPanelVisible = false
     private var smoothedAverageTemperature: Double?
-    private let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/Fallet666/vent/releases/latest")!
+    private let fetchRelease: (UpdateChannel) async throws -> GitHubRelease?
+    private var updateCheckTask: Task<Void, Never>?
+    private var updateCheckGeneration = 0
     private var latestRelease: GitHubRelease?
     private var updateDownloader: UpdateDownloader?
 
-    private init() {
+    init(startRefreshLoop: Bool = true, fetchRelease: @escaping (UpdateChannel) async throws -> GitHubRelease? = { try await ReleaseChecker.fetch(channel: $0) }, notifyLoudFans: @escaping (@escaping (Bool) -> Void) -> Void = { LoudFanNotifier.shared.send(completion: $0) }) {
+        self.notifyLoudFans = notifyLoudFans
+        self.fetchRelease = fetchRelease
         UserDefaults.standard.register(defaults: [
             Self.updateChecksEnabledKey: true,
+            UpdateChannel.preferenceKey: UpdateChannel.stable.rawValue,
             "updateDaemonWithGUI": true
         ])
-        startRefreshLoop()
+        if startRefreshLoop { self.startRefreshLoop() }
         loadProfiles()
     }
 
     func refresh() {
-        guard !isRefreshing else { return }
+        guard !isRefreshing, !isTerminating else { return }
         isRefreshing = true
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
 
             let online = VentDaemonClient.shared.isRunning()
+            DispatchQueue.main.async {
+                self.initialConnectionCheckCompleted = true
+                if online { self.hasConnectedToDaemon = true }
+            }
             guard online else {
                 DispatchQueue.main.async {
                     self.isRefreshing = false
+                    self.daemonOnline = false
                     self.fans = []
                     self.averageTemperature = nil
                     self.helperVersion = nil
@@ -348,6 +370,8 @@ final class VentDaemonManager: ObservableObject {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
+                guard !self.isTerminating else { self.isRefreshing = false; return }
+                self.hasConnectedToDaemon = true
                 self.helperVersion = version
                 if let daemonConfig {
                     self.config = daemonConfig
@@ -386,6 +410,7 @@ final class VentDaemonManager: ObservableObject {
                     self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
                 }
                 self.daemonOnline = true
+                self.checkLoudFanNotification()
                 if self.statusMessage != String(localized: "Ready") {
                     self.statusMessage = String(localized: "Ready")
                 }
@@ -396,7 +421,7 @@ final class VentDaemonManager: ObservableObject {
 
     var helperNeedsUpdate: Bool {
         guard let helperVersion else { return !daemonOnline }
-        return normalizedReleaseVersion(helperVersion) != normalizedReleaseVersion(bundledVersion)
+        return compareReleaseVersions(helperVersion, bundledVersion) != .orderedSame
     }
 
     var appUpdateAvailable: Bool {
@@ -405,7 +430,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     var dmgDownloadURL: URL? {
-        latestRelease?.assets.first(where: { $0.contentType == "application/x-apple-diskimage" })?.browserDownloadURL
+        latestRelease?.dmgDownloadURL
     }
 
     func checkForUpdatesIfEnabled() {
@@ -421,43 +446,44 @@ final class VentDaemonManager: ObservableObject {
         return Date().timeIntervalSince(lastCheckDate) >= Self.updateCheckInterval
     }
 
+    func updateChannelChanged() {
+        updateCheckGeneration += 1
+        updateCheckTask?.cancel()
+        isCheckingForUpdates = false
+        latestRelease = nil
+        latestReleaseVersion = nil
+        latestReleaseURL = nil
+        updateCheckMessage = nil
+        UserDefaults.standard.removeObject(forKey: Self.lastUpdateCheckDateKey)
+        checkForUpdatesIfEnabled()
+    }
+
     func checkForUpdates(manual: Bool) {
-        guard !isCheckingForUpdates else { return }
+        guard !isCheckingForUpdates, !isDownloadingUpdate, !isInstallingUpdate, !isTerminating else { return }
+        let channel = UpdateChannel.saved()
+        let generation = updateCheckGeneration
         isCheckingForUpdates = true
         if manual {
             updateCheckMessage = String(localized: "Checking for updates...")
         }
 
-        Task.detached { [latestReleaseAPIURL] in
+        updateCheckTask = Task {
             do {
-                var request = URLRequest(url: latestReleaseAPIURL)
-                request.timeoutInterval = 6
-                request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-                request.setValue("Vent", forHTTPHeaderField: "User-Agent")
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200..<300).contains(httpResponse.statusCode) else {
-                    throw URLError(.badServerResponse)
-                }
-
-                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-                await MainActor.run {
-                    UserDefaults.standard.set(Date(), forKey: Self.lastUpdateCheckDateKey)
-                    self.latestRelease = release
-                    self.latestReleaseVersion = release.tagName
-                    self.latestReleaseURL = release.htmlURL
-                    self.updateCheckMessage = self.appUpdateAvailable ?
-                        String(format: String(localized: "Version %@ is available"), release.tagName) : String(localized: "Vent is up to date")
-                    self.isCheckingForUpdates = false
-                }
+                let release = try await fetchRelease(channel)
+                guard generation == updateCheckGeneration, channel == UpdateChannel.saved() else { return }
+                UserDefaults.standard.set(Date(), forKey: Self.lastUpdateCheckDateKey)
+                latestRelease = release
+                latestReleaseVersion = release?.tagName
+                latestReleaseURL = release?.htmlURL
+                updateCheckMessage = appUpdateAvailable ?
+                    String(format: String(localized: "Version %@ is available"), release!.tagName) : String(localized: "Vent is up to date")
+                isCheckingForUpdates = false
             } catch {
-                await MainActor.run {
-                    if manual {
-                        self.updateCheckMessage = String(localized: "Could not check for updates")
-                    }
-                    self.isCheckingForUpdates = false
+                guard generation == updateCheckGeneration, channel == UpdateChannel.saved() else { return }
+                if manual {
+                    updateCheckMessage = String(localized: "Could not check for updates")
                 }
+                isCheckingForUpdates = false
             }
         }
     }
@@ -468,16 +494,27 @@ final class VentDaemonManager: ObservableObject {
     }
 
     static let pendingDaemonUpdateKey = "pendingDaemonUpdateAfterGUI"
+    static let pendingDaemonVersionKey = "pendingDaemonUpdateVersion"
+
+    static func consumePendingHelperUpdate(currentVersion: String, defaults: UserDefaults = .standard) -> Bool {
+        let requested = defaults.bool(forKey: pendingDaemonUpdateKey)
+        let expected = defaults.string(forKey: pendingDaemonVersionKey)
+        defaults.removeObject(forKey: pendingDaemonUpdateKey)
+        defaults.removeObject(forKey: pendingDaemonVersionKey)
+        // The legacy boolean supports the first update from older builds.
+        return requested && (expected == nil || expected == currentVersion)
+    }
+
+    private func clearPendingHelperUpdate() {
+        UserDefaults.standard.removeObject(forKey: Self.pendingDaemonUpdateKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingDaemonVersionKey)
+    }
 
     func downloadAndInstallUpdate() {
+        guard appUpdateAvailable, !isDownloadingUpdate, !isInstallingUpdate, !isTerminating else { return }
         guard let dmgURL = dmgDownloadURL else {
             updateCheckMessage = String(localized: "Download URL not available")
             return
-        }
-
-        let shouldUpdateDaemon = UserDefaults.standard.bool(forKey: "updateDaemonWithGUI")
-        if shouldUpdateDaemon {
-            UserDefaults.standard.set(true, forKey: Self.pendingDaemonUpdateKey)
         }
 
         isDownloadingUpdate = true
@@ -499,7 +536,7 @@ final class VentDaemonManager: ObservableObject {
             case .failure(let downloadError):
                 self?.isDownloadingUpdate = false
                 self?.updateCheckMessage = String(format: String(localized: "Download failed: %@"), downloadError.localizedDescription)
-                UserDefaults.standard.set(false, forKey: Self.pendingDaemonUpdateKey)
+                self?.clearPendingHelperUpdate()
             }
         }
         downloader.startDownload(from: dmgURL)
@@ -509,37 +546,47 @@ final class VentDaemonManager: ObservableObject {
         isDownloadingUpdate = false
         isInstallingUpdate = true
         updateCheckMessage = String(localized: "Installing...")
-
-        let appPath = Bundle.main.bundlePath
-        let mountPoint = "/tmp/fancontrol_mount"
-        let scriptPath = "/tmp/fancontrol_update.sh"
-
-        let script = """
-        #!/bin/bash
-        sleep 2
-        /usr/bin/hdiutil attach "\(dmgURL.path)" -mountpoint "\(mountPoint)" -nobrowse -quiet
-        /bin/rm -rf "\(appPath)"
-        /bin/cp -R "\(mountPoint)/Vent.app" "\(appPath)"
-        /usr/bin/hdiutil detach "\(mountPoint)" -quiet -force
-        /bin/rm -f "\(dmgURL.path)" "\(scriptPath)"
-        /usr/bin/open "\(appPath)"
-        """
-
-        do {
-            try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/bash")
-            process.arguments = [scriptPath]
-            try process.run()
-        } catch {
+        guard let tag = latestReleaseVersion else {
             isInstallingUpdate = false
-            updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+            try? FileManager.default.removeItem(at: dmgURL.deletingLastPathComponent())
             return
         }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NSApplication.shared.terminate(nil)
+        let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        let destination = Bundle.main.bundleURL
+        Task {
+            do {
+                let prepared = try await Task.detached {
+                    defer { try? FileManager.default.removeItem(at: dmgURL.deletingLastPathComponent()) }
+                    return try AppUpdateInstaller.prepare(dmg: dmgURL, destination: destination, version: version)
+                }.value
+                prepareForTermination { restored in
+                    guard restored else {
+                        prepared.discard()
+                        self.isInstallingUpdate = false
+                        self.updateCheckMessage = String(localized: "Could not restore automatic fan control")
+                        self.clearPendingHelperUpdate()
+                        return
+                    }
+                    do {
+                        try prepared.launch(waitingFor: ProcessInfo.processInfo.processIdentifier)
+                        if UserDefaults.standard.bool(forKey: "updateDaemonWithGUI") {
+                            UserDefaults.standard.set(true, forKey: Self.pendingDaemonUpdateKey)
+                            UserDefaults.standard.set(version, forKey: Self.pendingDaemonVersionKey)
+                        }
+                        NSApplication.shared.terminate(nil)
+                    } catch {
+                        prepared.discard()
+                        self.isInstallingUpdate = false
+                        self.cancelTermination()
+                        self.clearPendingHelperUpdate()
+                        self.updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+                    }
+                }
+            } catch {
+                isInstallingUpdate = false
+                clearPendingHelperUpdate()
+                updateCheckMessage = String(format: String(localized: "Install failed: %@"), error.localizedDescription)
+            }
         }
     }
 
@@ -556,12 +603,12 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setControlMode(_ mode: VentMode) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
         controlMode = mode
         let rpm = commonRPM
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
             if mode == .manualRPM {
                 let _ = VentDaemonClient.shared.setAllFans(rpm: rpm)
@@ -576,15 +623,15 @@ final class VentDaemonManager: ObservableObject {
             targetTemperature = temperature
         }
         selectedProfileID = nil
-        guard daemonOnline, controlMode == .autoTemp else { return }
+        guard daemonOnline, !isTerminating, controlMode == .autoTemp else { return }
         let temp = targetTemperature
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
         }
     }
 
     func setFan(index: Int, rpm: Int) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let clampedRPM = clamped(rpm: rpm, for: index)
         let currentMode = controlMode
@@ -593,7 +640,7 @@ final class VentDaemonManager: ObservableObject {
         if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
             fans[fanIndex].rpm = clampedRPM
         }
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             if currentMode != .manualRPM {
                 VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
             }
@@ -606,7 +653,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setAllFans(rpm: Int) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
         let clampedRPM = clampedForAllFans(rpm: rpm)
         let currentMode = controlMode
@@ -614,7 +661,7 @@ final class VentDaemonManager: ObservableObject {
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
         }
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             if currentMode != .manualRPM {
                 let _ = VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
             }
@@ -623,15 +670,15 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func setAutoAll() {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.auto)
         }
     }
 
     func installOrUpdateDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         isInstalling = true
         statusMessage = "Requesting admin permission..."
 
@@ -646,7 +693,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func uninstallDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         isUninstalling = true
         statusMessage = "Requesting admin permission..."
 
@@ -654,6 +701,12 @@ final class VentDaemonManager: ObservableObject {
             let result = VentInstaller.uninstallDaemon()
             await MainActor.run {
                 self.isUninstalling = false
+                if result.success {
+                    self.hasConnectedToDaemon = false
+                    self.daemonOnline = false
+                    self.controlMode = .auto
+                    self.fans = []
+                }
                 self.statusMessage = result.message
                 self.refresh()
             }
@@ -661,7 +714,7 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func confirmAndUninstallDaemon() {
-        guard !isInstalling, !isUninstalling else { return }
+        guard !isInstalling, !isUninstalling, !isTerminating else { return }
         let alert = NSAlert()
         alert.messageText = "Uninstall privileged helper?"
         alert.informativeText = "Vent will switch fans back to Auto, stop the daemon, and remove installed helper binaries. The app itself will stay installed."
@@ -674,8 +727,97 @@ final class VentDaemonManager: ObservableObject {
     }
 
     func quit() {
-        refreshTask?.cancel()
         NSApplication.shared.terminate(nil)
+    }
+
+    // The termination delegate waits for the helper acknowledgement before exit.
+    // All previously accepted fan writes finish before this final Auto command.
+    func prepareForTermination(completion: @escaping (Bool) -> Void) {
+        if automaticControlRestoredForTermination {
+            Self.onTerminationRunLoop { completion(true) }
+            return
+        }
+        if isTerminating {
+            terminationCompletions.append(completion)
+            return
+        }
+        guard !isInstalling, !isUninstalling else {
+            Self.onTerminationRunLoop { completion(false) }
+            return
+        }
+        terminationCompletions = [completion]
+        isTerminating = true
+        refreshTask?.cancel()
+        commandQueue.async {
+            let client = VentDaemonClient.shared
+            let response = client.sendCommand("MODE AUTO")
+            let helperAbsent = response == nil && client.helperIsAbsent()
+            Self.onTerminationRunLoop {
+                // Only a completed, offline first probe can establish "no helper".
+                // A helper seen even once must acknowledge Auto before we exit.
+                let neverConnected = self.initialConnectionCheckCompleted && !self.hasConnectedToDaemon && !self.daemonOnline
+                let restored = response == "OK" || (helperAbsent && neverConnected)
+                self.automaticControlRestoredForTermination = restored
+                if restored {
+                    self.controlMode = .auto
+                } else {
+                    self.cancelTermination()
+                }
+                let completions = self.terminationCompletions
+                self.terminationCompletions.removeAll()
+                completions.forEach { $0(restored) }
+            }
+        }
+    }
+
+    // AppKit may pump a nested run loop inside terminate(_:). A main-queue
+    // callback can deadlock if the caller is already a main-queue task.
+    nonisolated private static func onTerminationRunLoop(_ action: @escaping @MainActor () -> Void) {
+        RunLoop.main.perform(inModes: [.common]) {
+            MainActor.assumeIsolated { action() }
+        }
+        CFRunLoopWakeUp(CFRunLoopGetMain())
+    }
+
+    private func cancelTermination() {
+        isTerminating = false
+        automaticControlRestoredForTermination = false
+        startRefreshLoop()
+    }
+
+    func loudFanNotificationsChanged(enabled: Bool) {
+        notificationGeneration += 1
+        let generation = notificationGeneration
+        loudFanAlertState = LoudFanAlertState()
+        notificationInFlight = false
+        requestingNotificationPermission = enabled
+        guard enabled else { return }
+        LoudFanNotifier.shared.requestAuthorization { [weak self] granted in
+            DispatchQueue.main.async {
+                guard let self, self.notificationGeneration == generation else { return }
+                self.requestingNotificationPermission = false
+                if granted && UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) {
+                    self.refresh()
+                }
+            }
+        }
+    }
+
+    private func checkLoudFanNotification() {
+        guard !requestingNotificationPermission, !notificationInFlight else { return }
+        let enabled = UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey)
+        guard loudFanAlertState.shouldNotify(enabled: enabled, noiseRatio: LoudFanAlertState.noiseRatio(for: fans)) else { return }
+        notificationInFlight = true
+        let generation = notificationGeneration
+        notifyLoudFans { [weak self] accepted in
+            DispatchQueue.main.async {
+                guard let self, self.notificationGeneration == generation else { return }
+                self.notificationInFlight = false
+                // Denied permission or a failed add must not consume the episode.
+                // Re-check on the next sample, including after settings change.
+                if !accepted { self.loudFanAlertState = LoudFanAlertState() }
+            }
+        }
     }
 
     var commonMinRPM: Int {
@@ -698,12 +840,13 @@ final class VentDaemonManager: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self, self.isPanelVisible else {
+                guard let self else { return }
+                guard self.isPanelVisible || UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) else {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     continue
                 }
                 self.refresh()
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                try? await Task.sleep(nanoseconds: self.isPanelVisible ? 1_000_000_000 : 2_000_000_000)
             }
         }
     }
@@ -746,6 +889,7 @@ final class UpdateDownloader: NSObject, URLSessionDownloadDelegate {
     var onProgressUpdate: ((Double) -> Void)?
     var onDownloadComplete: ((Result<URL, Error>) -> Void)?
     private var session: URLSession?
+    private var completed = false
 
     func startDownload(from downloadURL: URL) {
         let configuration = URLSessionConfiguration.default
@@ -761,20 +905,32 @@ final class UpdateDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        let stableURL = URL(fileURLWithPath: "/tmp/fancontrol_update.dmg")
-        try? FileManager.default.removeItem(at: stableURL)
+        guard let response = downloadTask.response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+            finish(.failure(URLError(.badServerResponse)))
+            return
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("vent-download-\(UUID().uuidString)")
         do {
-            try FileManager.default.moveItem(at: location, to: stableURL)
-            onDownloadComplete?(.success(stableURL))
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            let destination = directory.appendingPathComponent("Vent.dmg")
+            try FileManager.default.moveItem(at: location, to: destination)
+            finish(.success(destination))
         } catch {
-            onDownloadComplete?(.failure(error))
+            try? FileManager.default.removeItem(at: directory)
+            finish(.failure(error))
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let downloadError = error {
-            onDownloadComplete?(.failure(downloadError))
-        }
+        if let error { finish(.failure(error)) }
+    }
+
+    private func finish(_ result: Result<URL, Error>) {
+        guard !completed else { return }
+        completed = true
+        session?.finishTasksAndInvalidate()
+        session = nil
+        onDownloadComplete?(result)
     }
 }
 
@@ -1056,7 +1212,7 @@ extension VentDaemonManager {
     }
 
     func applyProfile(_ profile: VentProfile) {
-        guard daemonOnline else { return }
+        guard daemonOnline, !isTerminating else { return }
 
         selectedProfileID = profile.id
         persistProfiles()
@@ -1067,7 +1223,7 @@ extension VentDaemonManager {
         let rpms = profile.fanRPMs
         let fanCount = fans.count
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        commandQueue.async {
             VentDaemonClient.shared.setMode(mode, targetTemperature: temp)
             if mode == .autoTemp {
                 VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)

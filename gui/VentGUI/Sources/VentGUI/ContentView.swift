@@ -1,12 +1,11 @@
 import SwiftUI
 import ServiceManagement
-import UserNotifications
-import Combine
 
 struct ContentView: View {
     @EnvironmentObject var daemon: VentDaemonManager
     @AppStorage("temperatureUnit") private var temperatureUnitRaw = TemperatureUnit.celsius.rawValue
     @AppStorage(VentDaemonManager.updateChecksEnabledKey) private var updateChecksAutomatically = true
+    @AppStorage(UpdateChannel.preferenceKey) private var updateChannelRaw = UpdateChannel.stable.rawValue
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
     @AppStorage("loudFanNotificationEnabled") private var loudFanNotificationEnabled = false
@@ -17,7 +16,6 @@ struct ContentView: View {
     @State private var profileForRename: VentProfile?
     @State private var showsRenameInput = false
     @State private var renameText = ""
-    @State private var wasFanLoud = false
 
     private var temperatureUnit: TemperatureUnit {
         TemperatureUnit(rawValue: temperatureUnitRaw) ?? .celsius
@@ -50,14 +48,7 @@ struct ContentView: View {
                 .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7)
         )
         .compositingGroup()
-        .onAppear {
-            daemon.refresh()
-            requestNotificationPermission()
-            checkLoudFanNotification()
-        }
-        .onReceive(Just(())) { _ in
-            checkLoudFanNotification()
-        }
+        .onAppear { daemon.refresh() }
         .alert("Save Profile", isPresented: $showsProfileNameInput) {
             TextField("Profile name", text: $newProfileName)
             Button("Cancel", role: .cancel) { }
@@ -134,38 +125,8 @@ struct ContentView: View {
     }
 
     private var fansNoiseLevel: Double? {
-        let maxFanRPMs = daemon.fans.map { Double($0.maxRPM) }
-        let currentRPMs = daemon.fans.map { Double($0.currentRPM) }
-        guard let maxMax = maxFanRPMs.max(), maxMax > 0 else { return nil }
-        let maxCurrent = currentRPMs.max()!
-        let ratio = maxCurrent / maxMax
-        return ratio >= 0.7 ? ratio : nil
-    }
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
-
-    private func checkLoudFanNotification() {
-        guard loudFanNotificationEnabled else { return }
-        let isFanLoud = fansNoiseLevel != nil
-        if isFanLoud && !wasFanLoud {
-            sendLoudFanNotification()
-        }
-        wasFanLoud = isFanLoud
-    }
-
-    private func sendLoudFanNotification() {
-        let content = UNMutableNotificationContent()
-        content.title = String(localized: "Vent")
-        content.body = String(localized: "Fans are running at high speed and may be loud.")
-        content.sound = .default
-        let request = UNNotificationRequest(
-            identifier: "loudFan",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        guard let ratio = LoudFanAlertState.noiseRatio(for: daemon.fans), ratio >= 0.7 else { return nil }
+        return ratio
     }
 
     private var noiseWarningBanner: some View {
@@ -345,9 +306,8 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle(String(localized: "Notify when fans are loud"), isOn: $loudFanNotificationEnabled)
                     .onChange(of: loudFanNotificationEnabled) { newValue in
-                        if newValue {
-                            requestNotificationPermission()
-                        }
+                        daemon.loudFanNotificationsChanged(enabled: newValue)
+
                     }
                 Text(String(localized: "Useful for hearing impaired"))
                     .font(.caption)
@@ -444,6 +404,15 @@ struct ContentView: View {
     private var updatesSettingsView: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(String(localized: "Updates"))
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Picker(String(localized: "Update channel"), selection: $updateChannelRaw) {
+                Text(String(localized: "Stable")).tag(UpdateChannel.stable.rawValue)
+                Text(String(localized: "Beta")).tag(UpdateChannel.beta.rawValue)
+            }
+            .disabled(daemon.isDownloadingUpdate || daemon.isInstallingUpdate)
+            .onChange(of: updateChannelRaw) { _ in daemon.updateChannelChanged() }
+            Text(String(localized: "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app."))
                 .font(.caption)
                 .foregroundColor(.secondary)
             Toggle(String(localized: "Automatically check for updates"), isOn: $updateChecksAutomatically)
