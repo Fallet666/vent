@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
@@ -13,6 +14,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private let panelWidth: CGFloat = 320
     private let daemon: VentDaemonManager
     private var awaitingTermination = false
+    private var statusUpdates: AnyCancellable?
 
     public override init() {
         daemon = .shared
@@ -40,6 +42,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let button = item.button {
             button.title = ""
+            button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             button.image = loadMenuBarImage()
             button.target = self
             button.action = #selector(togglePopover)
@@ -52,6 +55,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
         installOutsideClickMonitors()
+        statusUpdates = daemon.objectWillChange.sink { [weak self] in
+            DispatchQueue.main.async { self?.updateStatusItem() }
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(updateStatusItem),
+            name: UserDefaults.didChangeNotification, object: nil)
+        updateStatusItem()
 
         let mainMenu = NSMenu()
         let appMenuItem = NSMenuItem()
@@ -110,7 +119,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover() {
-        if panel?.isVisible == true && panel?.isKeyWindow == true {
+        if panel?.isVisible == true {
             closePanel()
         } else {
             showPanel()
@@ -133,55 +142,34 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let panelSize = adaptivePanelSize(for: panel, screen: screen)
         panel.setContentSize(panelSize)
         panel.setFrameOrigin(panelOrigin(for: button, panelSize: panelSize, screen: screen))
-        panel.alphaValue = 0
-        panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
-        panel.displayIfNeeded()
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        panel.animator().alphaValue = 1
-        if let contentView = panel.contentView {
-            contentView.layer?.transform = CATransform3DMakeScale(0.96, 0.96, 1)
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                contentView.animator().layer?.transform = CATransform3DIdentity
-            }
-        }
     }
 
     private func closePanel() {
-        guard let panel else { return }
         daemon.isPanelVisible = false
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().alphaValue = 0
-        } completionHandler: {
-            panel.orderOut(nil)
-        }
+        panel?.orderOut(nil)
     }
 
     private func installOutsideClickMonitors() {
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self else { return event }
-            if event.window !== self.panel, event.window !== self.statusItem?.button?.window {
+            if event.window !== self.panel, event.window !== self.panel?.attachedSheet,
+               event.window !== self.statusItem?.button?.window, NSApp.modalWindow == nil {
                 self.closePanel()
             }
             return event
         }
 
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.closePanelIfClickIsOutside()
-            }
+            self?.closePanelIfClickIsOutside(at: NSEvent.mouseLocation)
         }
     }
 
-    private func closePanelIfClickIsOutside() {
-        guard let panel, panel.isVisible else { return }
-        if !panel.frame.contains(NSEvent.mouseLocation) {
-            closePanel()
-        }
+    private func closePanelIfClickIsOutside(at location: NSPoint) {
+        guard let panel, panel.isVisible, panel.attachedSheet == nil, NSApp.modalWindow == nil else { return }
+        if let button = statusItem?.button, let window = button.window,
+           window.convertToScreen(button.convert(button.bounds, to: nil)).contains(location) { return }
+        if !panel.frame.contains(location) { closePanel() }
     }
 
     @objc private func resizePanelToFitContent() {
@@ -217,7 +205,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         let panel = VentPanel(
             contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 360),
-            styleMask: [.borderless, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -231,8 +219,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
         panel.worksWhenModal = true
+        panel.animationBehavior = .none
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = hostingView
@@ -262,6 +252,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         daemon.quit()
     }
 
+    @objc private func updateStatusItem() {
+        guard let button = statusItem?.button else { return }
+        let mask = UserDefaults.standard.object(forKey: MenuBarMetric.preferenceKey) as? Int ?? MenuBarMetric.icon.rawValue
+        let summary = daemon.menuBarSummary(mask: mask)
+        let showIcon = MenuBarMetric.icon.isEnabled(in: mask) || summary.isEmpty
+        let imagePosition: NSControl.ImagePosition = showIcon ? (summary.isEmpty ? .imageOnly : .imageLeading) : .noImage
+        if button.title != summary { button.title = summary }
+        if (button.image != nil) != showIcon { button.image = showIcon ? loadMenuBarImage() : nil }
+        if button.imagePosition != imagePosition { button.imagePosition = imagePosition }
+        let length = summary.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
+        if statusItem?.length != length { statusItem?.length = length }
+    }
+
     private func loadMenuBarImage() -> NSImage? {
         FanMenuBarIcon.make(size: 18)
     }
@@ -269,7 +272,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
 final class VentPanel: NSPanel {
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
 
 @MainActor
@@ -285,6 +288,7 @@ final class VentDaemonManager: ObservableObject {
     @Published var daemonOnline = false
     @Published var statusMessage = String(localized: "Connecting...")
     @Published var averageTemperature: Double?
+    @Published private(set) var sensorTemperatures: [VentDaemonTemperature] = []
     @Published var controlMode: VentMode = .auto
     @Published var targetTemperature: Double = 0
     @Published var autoTemperatureRPM: Int?
@@ -323,6 +327,8 @@ final class VentDaemonManager: ObservableObject {
     private let fetchRelease: (UpdateChannel) async throws -> GitHubRelease?
     private var updateCheckTask: Task<Void, Never>?
     private var updateCheckGeneration = 0
+    private var fanCommandGeneration = 0
+    private var lastTemperatureProfileID: UUID?
     private var latestRelease: GitHubRelease?
     private var updateDownloader: UpdateDownloader?
 
@@ -341,6 +347,7 @@ final class VentDaemonManager: ObservableObject {
     func refresh() {
         guard !isRefreshing, !isTerminating else { return }
         isRefreshing = true
+        let generation = fanCommandGeneration
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
@@ -356,6 +363,7 @@ final class VentDaemonManager: ObservableObject {
                     self.daemonOnline = false
                     self.fans = []
                     self.averageTemperature = nil
+                    self.sensorTemperatures = []
                     self.helperVersion = nil
                     self.statusMessage = String(localized: "Helper not installed")
                 }
@@ -366,7 +374,7 @@ final class VentDaemonManager: ObservableObject {
             let daemonFans = VentDaemonClient.shared.fans() ?? []
             let daemonConfig = VentDaemonClient.shared.config()
             let temperatures = VentDaemonClient.shared.temperatures() ?? []
-            let modeStatus = VentDaemonClient.shared.modeStatus()
+            let modeStatus = self.commandQueue.sync { VentDaemonClient.shared.modeStatus() }
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -391,21 +399,25 @@ final class VentDaemonManager: ObservableObject {
                         manualMode: fan.manualMode
                     )
                 }
-                if self.fans.count == newFans.count {
-                    for i in newFans.indices {
-                        newFans[i].rpm = self.fans[i].rpm
+                if generation != self.fanCommandGeneration || modeStatus?.mode != .manualRPM {
+                    for index in newFans.indices {
+                        if let previous = self.fans.first(where: { $0.index == newFans[index].index }) {
+                            newFans[index].rpm = previous.rpm
+                        }
                     }
                 }
                 if self.fans != newFans {
                     self.fans = newFans
                 }
 
+                self.sensorTemperatures = temperatures.filter { $0.value.isFinite }.sorted { $0.key < $1.key }
                 let fallbackAverageTemperature = self.hottestTemperature(from: temperatures)
-                if let modeStatus {
+                if let modeStatus, generation == self.fanCommandGeneration {
                     self.controlMode = modeStatus.mode
                     self.targetTemperature = modeStatus.targetTemperature
                     self.averageTemperature = self.smoothedTemperature(modeStatus.averageTemperature ?? fallbackAverageTemperature)
                     self.autoTemperatureRPM = modeStatus.autoRPM
+                    self.syncSelectedProfileWithDaemon(mode: modeStatus.mode, targetTemp: modeStatus.targetTemperature)
                 } else {
                     self.averageTemperature = self.smoothedTemperature(fallbackAverageTemperature)
                 }
@@ -604,10 +616,11 @@ final class VentDaemonManager: ObservableObject {
 
     func setControlMode(_ mode: VentMode) {
         guard daemonOnline, !isTerminating else { return }
-        selectedProfileID = nil
         let modeTargetTemperature = targetTemperature > 0 ? targetTemperature : config?.defaultTargetTemperature
         controlMode = mode
+        syncSelectedProfileWithDaemon(mode: mode, targetTemp: modeTargetTemperature ?? 0)
         let rpm = commonRPM
+        fanCommandGeneration += 1
         commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(mode, targetTemperature: modeTargetTemperature)
             if mode == .manualRPM {
@@ -625,6 +638,7 @@ final class VentDaemonManager: ObservableObject {
         selectedProfileID = nil
         guard daemonOnline, !isTerminating, controlMode == .autoTemp else { return }
         let temp = targetTemperature
+        fanCommandGeneration += 1
         commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
         }
@@ -640,6 +654,7 @@ final class VentDaemonManager: ObservableObject {
         if let fanIndex = fans.firstIndex(where: { $0.index == index }) {
             fans[fanIndex].rpm = clampedRPM
         }
+        fanCommandGeneration += 1
         commandQueue.async {
             if currentMode != .manualRPM {
                 VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
@@ -661,6 +676,7 @@ final class VentDaemonManager: ObservableObject {
         for fanIndex in fans.indices {
             fans[fanIndex].rpm = clampedRPM
         }
+        fanCommandGeneration += 1
         commandQueue.async {
             if currentMode != .manualRPM {
                 let _ = VentDaemonClient.shared.setMode(.manualRPM, targetTemperature: temp)
@@ -672,6 +688,7 @@ final class VentDaemonManager: ObservableObject {
     func setAutoAll() {
         guard daemonOnline, !isTerminating else { return }
         selectedProfileID = nil
+        fanCommandGeneration += 1
         commandQueue.async {
             let _ = VentDaemonClient.shared.setMode(.auto)
         }
@@ -841,7 +858,9 @@ final class VentDaemonManager: ObservableObject {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                guard self.isPanelVisible || UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) else {
+                let mask = UserDefaults.standard.integer(forKey: MenuBarMetric.preferenceKey)
+                guard self.isPanelVisible || mask & ~MenuBarMetric.icon.rawValue != 0 ||
+                        UserDefaults.standard.bool(forKey: Self.loudFanNotificationsEnabledKey) else {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     continue
                 }
@@ -1128,7 +1147,7 @@ extension VentDaemonManager {
     private static let quietProfile = VentProfile(
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
         name: "Quiet",
-        mode: .auto,
+        mode: .autoTemp,
         targetTemperature: 70,
         separateFans: false,
         fanRPMs: []
@@ -1165,28 +1184,22 @@ extension VentDaemonManager {
         [quietProfile, normalProfile, gamingProfile, lapProfile]
     }
 
-    private static let stockProfileIDs: Set<UUID> = {
-        [quietProfile.id, normalProfile.id, gamingProfile.id, lapProfile.id]
-    }()
-
     func loadProfiles() {
         guard let data = UserDefaults.standard.data(forKey: Self.profilesKey),
-              let loaded = try? JSONDecoder().decode([VentProfile].self, from: data), !loaded.isEmpty else {
+              let loaded = try? JSONDecoder().decode([VentProfile].self, from: data) else {
             profiles = Self.stockProfiles
-            UserDefaults.standard.set(try? JSONEncoder().encode(profiles), forKey: Self.profilesKey)
             selectedProfileID = Self.normalProfile.id
-            UserDefaults.standard.set(selectedProfileID?.uuidString, forKey: Self.selectedProfileIDKey)
+            persistProfiles()
             return
         }
-        profiles = loaded
-        let customProfiles = profiles.filter { !$0.isStockProfile }
-        profiles = Self.stockProfiles + customProfiles
+        // Update built-in definitions by ID while retaining the user's deletions.
+        profiles = loaded.map { saved in Self.stockProfiles.first { $0.id == saved.id } ?? saved }
         if let savedID = UserDefaults.standard.string(forKey: Self.selectedProfileIDKey),
            let uuid = UUID(uuidString: savedID),
            profiles.contains(where: { $0.id == uuid }) {
             selectedProfileID = uuid
         } else {
-            selectedProfileID = profiles.first?.id
+            selectedProfileID = nil
         }
     }
 
@@ -1215,6 +1228,11 @@ extension VentDaemonManager {
         guard daemonOnline, !isTerminating else { return }
 
         selectedProfileID = profile.id
+        controlMode = profile.mode
+        if profile.mode == .autoTemp {
+            targetTemperature = profile.targetTemperature
+            lastTemperatureProfileID = profile.id
+        }
         persistProfiles()
 
         let mode = profile.mode
@@ -1223,11 +1241,9 @@ extension VentDaemonManager {
         let rpms = profile.fanRPMs
         let fanCount = fans.count
 
+        fanCommandGeneration += 1
         commandQueue.async {
             VentDaemonClient.shared.setMode(mode, targetTemperature: temp)
-            if mode == .autoTemp {
-                VentDaemonClient.shared.setMode(.autoTemp, targetTemperature: temp)
-            }
             if mode == .manualRPM {
                 if !separate, let firstRPM = rpms.first {
                     VentDaemonClient.shared.setAllFans(rpm: firstRPM)
@@ -1249,12 +1265,7 @@ extension VentDaemonManager {
 
     func deleteProfile(_ profile: VentProfile) {
         profiles.removeAll { $0.id == profile.id }
-        if profiles.isEmpty {
-            profiles = Array(Self.stockProfiles)
-        }
-        if selectedProfileID == profile.id {
-            selectedProfileID = profiles.first?.id
-        }
+        if selectedProfileID == profile.id { selectedProfileID = nil }
         persistProfiles()
     }
 
@@ -1265,20 +1276,21 @@ extension VentDaemonManager {
     }
 
     private func syncSelectedProfileWithDaemon(mode: VentMode, targetTemp: Double) {
-        let match: VentProfile? = {
-            switch mode {
-            case .auto:
-                return profiles.first { $0.mode == .auto && $0.isStockProfile }
-            case .autoTemp:
-                return profiles.filter({ $0.mode == .autoTemp && $0.isStockProfile })
-                    .min(by: { abs($0.targetTemperature - targetTemp) < abs($1.targetTemperature - targetTemp) })
-            case .manualRPM:
-                return nil
-            }
-        }()
-        if let match {
-            selectedProfileID = match.id
-            persistProfiles()
+        if let selected = profiles.first(where: { $0.id == selectedProfileID }),
+           selected.mode == mode,
+           mode != .autoTemp || abs(selected.targetTemperature - targetTemp) < 0.01 {
+            if mode == .autoTemp { lastTemperatureProfileID = selected.id }
+            return
         }
+
+        var match: VentProfile?
+        if mode == .autoTemp {
+            let matches = profiles.filter { $0.mode == .autoTemp && abs($0.targetTemperature - targetTemp) < 0.01 }
+            match = matches.first { $0.id == lastTemperatureProfileID } ?? matches.first
+            lastTemperatureProfileID = match?.id
+        }
+        guard selectedProfileID != match?.id else { return }
+        selectedProfileID = match?.id
+        UserDefaults.standard.set(selectedProfileID?.uuidString, forKey: Self.selectedProfileIDKey)
     }
 }

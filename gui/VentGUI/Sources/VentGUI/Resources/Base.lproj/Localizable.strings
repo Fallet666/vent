@@ -96,3 +96,13 @@
 "Stable" = "Stable";
 "Beta" = "Beta";
 "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app.";
+
+"Menu bar" = "Menu bar";
+"Fan icon" = "Fan icon";
+"Fan RPM" = "Fan RPM";
+"Target RPM" = "Target RPM";
+"Target temperature" = "Target temperature";
+"Profile" = "Profile";
+"Install Vent update?" = "Install Vent update?";
+"Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper." = "Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper.";
+"Continue" = "Continue";

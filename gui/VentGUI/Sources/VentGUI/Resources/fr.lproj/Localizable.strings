@@ -96,3 +96,13 @@
 "Stable" = "Stable";
 "Beta" = "Bêta";
 "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Le canal bêta inclut les préversions. Le canal stable propose uniquement des mises à jour stables, sans revenir à une version antérieure.";
+
+"Menu bar" = "Barre des menus";
+"Fan icon" = "Icône du ventilateur";
+"Fan RPM" = "Vitesse du ventilateur";
+"Target RPM" = "Vitesse cible";
+"Target temperature" = "Température cible";
+"Profile" = "Profil";
+"Install Vent update?" = "Installer la mise à jour de Vent ?";
+"Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper." = "Vent se fermera brièvement et se rouvrira après l’installation. macOS peut demander l’autorisation de mettre à jour le service auxiliaire.";
+"Continue" = "Continuer";

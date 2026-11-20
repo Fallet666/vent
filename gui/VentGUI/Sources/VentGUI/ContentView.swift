@@ -9,6 +9,9 @@ struct ContentView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("updateDaemonWithGUI") private var updateDaemonWithGUI = true
     @AppStorage("loudFanNotificationEnabled") private var loudFanNotificationEnabled = false
+    @AppStorage(MenuBarMetric.sensorKey) private var menuBarSensor = ""
+    @AppStorage(MenuBarMetric.preferenceKey) private var menuBarMask = MenuBarMetric.icon.rawValue
+    @State private var confirmsUpdate = false
     @State private var launchAtLoginError: String?
     @State private var showsSettings = false
     @State private var showsProfileNameInput = false
@@ -29,7 +32,8 @@ struct ContentView: View {
                         .environmentObject(daemon)
                         .frame(width: 296)
                 } else if showsSettings {
-                    settingsView
+                    ScrollView { settingsView }
+                        .frame(height: 450)
                 } else {
                     mainView
                 }
@@ -49,6 +53,15 @@ struct ContentView: View {
         )
         .compositingGroup()
         .onAppear { daemon.refresh() }
+        .onChange(of: showsSettings) { _ in
+            DispatchQueue.main.async { AppDelegate.requestPanelResize() }
+        }
+        .alert("Install Vent update?", isPresented: $confirmsUpdate) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue") { daemon.downloadAndInstallUpdate() }
+        } message: {
+            Text("Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper.")
+        }
         .alert("Save Profile", isPresented: $showsProfileNameInput) {
             TextField("Profile name", text: $newProfileName)
             Button("Cancel", role: .cancel) { }
@@ -178,11 +191,9 @@ struct ContentView: View {
                                 renameText = profile.name
                                 showsRenameInput = true
                             }
-                            Button("Delete", role: .destructive) {
-                                withAnimation {
-                                    daemon.deleteProfile(profile)
-                                }
-                            }
+                        }
+                        Button("Delete", role: .destructive) {
+                            withAnimation { daemon.deleteProfile(profile) }
                         }
                     }
                 }
@@ -341,38 +352,53 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 ForEach(daemon.profiles) { profile in
-                    Button {
-                        daemon.applyProfile(profile)
-                    } label: {
-                        HStack {
-                            Text(profile.name)
-                            Spacer()
-                            if daemon.selectedProfileID == profile.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.accentColor)
+                    HStack {
+                        Button(profile.name) { daemon.applyProfile(profile) }
+                            .buttonStyle(.plain)
+                        Spacer()
+                        if daemon.selectedProfileID == profile.id {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.accentColor)
+                        }
+                        if !profile.isStockProfile {
+                            Button(String(localized: "Rename")) {
+                                profileForRename = profile
+                                renameText = profile.name
+                                showsRenameInput = true
                             }
-                            if !profile.isStockProfile {
-                                Button(String(localized: "Rename")) {
-                                    profileForRename = profile
-                                    renameText = profile.name
-                                    showsRenameInput = true
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundColor(.secondary)
-                                if daemon.profiles.count > 1 {
-                                    Button(String(localized: "Delete")) {
-                                        withAnimation {
-                                            daemon.deleteProfile(profile)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .foregroundColor(.red)
-                                }
-                            }
+                            .buttonStyle(.plain)
+                            .foregroundColor(.secondary)
+                        }
+                        Button(String(localized: "Delete")) {
+                            withAnimation { daemon.deleteProfile(profile) }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.red)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .settingsCard()
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Menu bar").font(.caption).foregroundColor(.secondary)
+                ForEach(MenuBarMetric.allCases) { metric in
+                    Toggle(metric.title, isOn: Binding(
+                        get: { metric.isEnabled(in: menuBarMask) },
+                        set: { enabled in
+                            if enabled { menuBarMask |= metric.rawValue }
+                            else { menuBarMask &= ~metric.rawValue }
+                        }
+                    ))
+                }
+                if !daemon.sensorTemperatures.isEmpty {
+                    Picker("Temperature", selection: $menuBarSensor) {
+                        Text("Temperature").tag("")
+                        ForEach(daemon.sensorTemperatures, id: \.key) { sensor in
+                            Text(verbatim: sensor.key).tag(sensor.key)
                         }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 2)
+                    .disabled(!MenuBarMetric.temperature.isEnabled(in: menuBarMask))
                 }
             }
             .settingsCard()
@@ -440,7 +466,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                     } else {
                         Button(String(localized: "Install and Restart")) {
-                            daemon.downloadAndInstallUpdate()
+                            confirmsUpdate = true
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.accentColor)
@@ -485,20 +511,11 @@ struct ContentView: View {
     }
 
     private var rpmSummaryValue: Int? {
-        if daemon.controlMode == .autoTemp, let autoRPM = daemon.autoTemperatureRPM {
-            return autoRPM
+        switch daemon.controlMode {
+        case .auto: return daemon.actualRPM
+        case .autoTemp: return daemon.autoTemperatureRPM
+        case .manualRPM: return daemon.targetRPM
         }
-        let values = daemon.fans.compactMap { fan -> Int? in
-            if daemon.controlMode == .manualRPM {
-                return fan.rpm > 0 ? fan.rpm : nil
-            }
-            if fan.currentRPM > 0 {
-                return fan.currentRPM
-            }
-            return fan.rpm > 0 ? fan.rpm : nil
-        }
-        guard !values.isEmpty else { return nil }
-        return values.reduce(0, +) / values.count
     }
 
     private var installButtonTitle: String {

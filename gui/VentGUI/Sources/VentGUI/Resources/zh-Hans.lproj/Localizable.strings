@@ -96,3 +96,13 @@
 "Stable" = "稳定版";
 "Beta" = "测试版";
 "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "测试版渠道包含预发布版本。切换到稳定版渠道后，仅接收稳定版更新，不会将已安装的应用降级。";
+
+"Menu bar" = "菜单栏";
+"Fan icon" = "风扇图标";
+"Fan RPM" = "风扇转速";
+"Target RPM" = "目标转速";
+"Target temperature" = "目标温度";
+"Profile" = "配置";
+"Install Vent update?" = "安装 Vent 更新？";
+"Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper." = "Vent 将短暂关闭，并在安装后重新打开。macOS 可能会请求更新辅助服务的权限。";
+"Continue" = "继续";

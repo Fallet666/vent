@@ -96,3 +96,13 @@
 "Stable" = "安定版";
 "Beta" = "ベータ版";
 "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "ベータ版には先行リリースが含まれます。安定版に切り替えると安定版の更新のみを受け取りますが、アプリはダウングレードされません。";
+
+"Menu bar" = "メニューバー";
+"Fan icon" = "ファンアイコン";
+"Fan RPM" = "ファンの回転数";
+"Target RPM" = "目標回転数";
+"Target temperature" = "目標温度";
+"Profile" = "プロファイル";
+"Install Vent update?" = "Vent のアップデートをインストールしますか？";
+"Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper." = "Vent は一時的に終了し、インストール後に再び開きます。macOS からヘルパーのアップデート許可を求められる場合があります。";
+"Continue" = "続ける";

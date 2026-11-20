@@ -96,3 +96,13 @@
 "Stable" = "Стабильный";
 "Beta" = "Бета";
 "Beta includes early releases. Switch to Stable to receive only stable updates; this does not downgrade the app." = "Бета-канал включает предварительные версии. Стабильный канал предлагает только стабильные обновления, но не откатывает установленную версию.";
+
+"Menu bar" = "Строка меню";
+"Fan icon" = "Значок вентилятора";
+"Fan RPM" = "Обороты вентилятора";
+"Target RPM" = "Целевые обороты";
+"Target temperature" = "Целевая температура";
+"Profile" = "Профиль";
+"Install Vent update?" = "Установить обновление Vent?";
+"Vent will close briefly and reopen after installation. macOS may ask for permission to update the helper." = "Vent ненадолго закроется и откроется снова после установки. macOS может запросить разрешение на обновление вспомогательной службы.";
+"Continue" = "Продолжить";

@@ -35,14 +35,14 @@ struct NativeSlider: NSViewRepresentable {
         slider.action = #selector(Coordinator.sliderChanged(_:))
         slider.frame.size.height = 24
 
-        if step > 0 {
-            slider.numberOfTickMarks = 0
-        }
+        slider.numberOfTickMarks = 7
+        slider.tickMarkPosition = .below
 
         return slider
     }
 
     func updateNSView(_ nsView: NSSlider, context: Context) {
+        context.coordinator.parent = self
         nsView.minValue = range.lowerBound
         nsView.maxValue = range.upperBound
         if !context.coordinator.isEditing {
@@ -56,7 +56,7 @@ struct NativeSlider: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject {
-        let parent: NativeSlider
+        var parent: NativeSlider
         fileprivate(set) var isEditing = false
         private var debounceTimer: Timer?
 

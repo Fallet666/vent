@@ -60,6 +60,46 @@ struct LifecycleIntegration {
         await waitUntil("initial refresh connected") { manager.daemonOnline && !manager.fans.isEmpty }
         check(!manager.isPanelVisible, "panel starts hidden")
 
+        if scenario == "profiles" {
+            let delegate = NSApp.delegate as! AppDelegate
+            let wasActive = NSApp.isActive
+            delegate.perform(NSSelectorFromString("togglePopover"))
+            let panel = NSApp.windows.compactMap { $0 as? VentPanel }.first
+            check(panel?.isVisible == true && panel?.isKeyWindow == false, "panel opens without taking key status")
+            delegate.perform(NSSelectorFromString("togglePopover"))
+            check(panel?.isVisible == false && !manager.isPanelVisible, "status button closes non-key panel")
+            delegate.perform(NSSelectorFromString("togglePopover"))
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            check(panel?.isVisible == true && NSApp.isActive == wasActive, "rapid reopen keeps panel visible and activation unchanged")
+            delegate.perform(NSSelectorFromString("togglePopover"))
+            let lap = manager.profiles.first { $0.name == "Lap" }!
+            let quiet = manager.profiles.first { $0.name == "Quiet" }!
+            manager.isPanelVisible = true
+            manager.applyProfile(lap)
+            await waitUntil("Lap sent to helper") {
+                VentDaemonClient.shared.modeStatus()?.targetTemperature == 30
+            }
+            manager.setControlMode(.auto)
+            await waitUntil("Auto reached helper") { VentDaemonClient.shared.modeStatus()?.mode == .auto }
+            check(manager.actualRPM == 0 && manager.targetRPM == nil, "Auto preserves stopped fan reading")
+            check(manager.menuBarSummary(mask: MenuBarMetric.rpm.rawValue) == "0 RPM", "RPM-only status includes zero")
+            manager.setControlMode(.autoTemp)
+            await waitUntil("temperature mode restored") { VentDaemonClient.shared.modeStatus()?.mode == .autoTemp }
+            check(manager.selectedProfileID == lap.id, "Lap highlighted after Auto round trip")
+            manager.applyProfile(quiet)
+            await waitUntil("Quiet sent as temperature profile") {
+                let status = VentDaemonClient.shared.modeStatus()
+                return status?.mode == .autoTemp && status?.targetTemperature == 70
+            }
+            let combined = MenuBarMetric.rpm.rawValue | MenuBarMetric.targetTemperature.rawValue | MenuBarMetric.profile.rawValue
+            check(manager.menuBarSummary(mask: combined).contains("Quiet"), "combined menu display includes profile")
+            for profile in manager.profiles { manager.deleteProfile(profile) }
+            manager.loadProfiles()
+            check(manager.profiles.isEmpty && manager.selectedProfileID == nil, "deleted built-in profiles stay deleted")
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
         if scenario == "disabled" {
             command("RESET_COUNT")
             try? await Task.sleep(nanoseconds: 2_500_000_000)

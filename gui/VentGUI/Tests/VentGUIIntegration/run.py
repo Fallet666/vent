@@ -26,6 +26,7 @@ class FakeHelper(socketserver.ThreadingUnixStreamServer):
     def __init__(self, path, scenario):
         super().__init__(path, Handler)
         self.lock = threading.Lock()
+        self.scenario = scenario
         self.high = False
         self.online = scenario != "unresponsive"
         self.auto = "OK"
@@ -35,6 +36,8 @@ class FakeHelper(socketserver.ThreadingUnixStreamServer):
         self.auto_acknowledged = False
         self.first_drop = scenario in ("first-drop", "unresponsive")
         self.version_seen = False
+        self.mode = "MANUAL_RPM"
+        self.target = 55
 
 
 class Handler(socketserver.StreamRequestHandler):
@@ -90,15 +93,21 @@ class Handler(socketserver.StreamRequestHandler):
                         server.online = False
                         delay = 2
                 elif command == "FANS":
-                    rpm = 5000 if server.high else 1000
-                    response = f"FANS 1\n0 {rpm} 1000 6000 {rpm} 1"
+                    rpm = 0 if server.scenario == "profiles" else 5000 if server.high else 1000
+                    response = f"FANS 1\n0 {rpm} 1000 6000 {rpm or 2500} 1"
                 elif command == "CONFIG":
                     response = "CONFIG 20 95 55 20 130"
                 elif command == "TEMPS":
                     response = "TEMPS 1\nTC0P 58"
                 elif command == "MODESTATUS":
-                    response = "MODE MANUAL_RPM 55 58 0"
+                    response = f"MODE {server.mode} {server.target} 58 0"
+                elif command.startswith("MODE TEMP "):
+                    server.mode = "AUTO_TEMP"
+                    server.target = int(command.split()[-1])
+                    response = "OK"
                 elif command == "MODE AUTO":
+                    if server.auto == "OK":
+                        server.mode = "AUTO"
                     response = server.auto
                     if response == "TIMEOUT":
                         delay, response = 6, "OK"
@@ -175,7 +184,7 @@ try (version + "|" + channel).write(to: Bundle.main.bundleURL.deletingLastPathCo
         environment["VENT_TEST_DOWNLOAD_URL"] = f"http://127.0.0.1:{download_server.server_port}"
         threading.Thread(target=download_server.serve_forever, daemon=True).start()
         try:
-            for scenario in ("installer", "updates", "missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
+            for scenario in ("installer", "updates", "profiles", "missing", "unresponsive", "disabled", "monitor", "retry-notification", "first-drop", "failure", "timeout", "ordering"):
                 helper = None
                 if scenario not in ("missing", "updates", "installer"):
                     helper = FakeHelper(str(socket_path), scenario)

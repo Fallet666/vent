@@ -16,6 +16,18 @@ static void handle_signal(int) {
     g_keep_running = 0;
 }
 
+static std::string daemon_control_mode() {
+    std::string response;
+    // MODESTATUS returns MODE, not OK, so inspect its response rather than the boolean.
+    daemon_send_command("MODESTATUS", &response);
+    auto parts = split_command(response);
+    if (parts.size() < 2 || parts[0] != "MODE") return {};
+    if (parts[1] == "AUTO") return "auto";
+    if (parts[1] == "MANUAL_RPM") return "manual RPM";
+    if (parts[1] == "AUTO_TEMP") return "temperature";
+    return {};
+}
+
 static void print_fan_info(const FanInfo& fan) {
     std::cout << "Fan #" << fan.index << ":\n";
     if (!fan.id.empty()) {
@@ -26,7 +38,7 @@ static void print_fan_info(const FanInfo& fan) {
     std::cout << "  Maximum:      " << fan.max_speed << " RPM\n";
     std::cout << "  Safe:         " << fan.safe_speed << " RPM\n";
     std::cout << "  Target:       " << fan.target_speed << " RPM\n";
-    std::cout << "  Mode:         " << (fan.manual_mode ? "manual" : "auto") << "\n";
+    std::cout << "  SMC control:  " << (fan.manual_mode ? "manual" : "auto") << "\n";
 }
 
 static void print_temp_info(const TemperatureInfo& temp) {
@@ -41,6 +53,10 @@ static void cmd_list(FanController& ctrl) {
         return;
     }
 
+    const auto mode = daemon_control_mode();
+    if (!mode.empty()) {
+        std::cout << "Vent mode: " << mode << "\n";
+    }
     std::cout << "Found " << fans.size() << " fan(s):\n\n";
     for (const auto& fan : fans) {
         print_fan_info(fan);
@@ -497,7 +513,7 @@ int main(int argc, char** argv) {
                          << " | " << std::fixed << std::setprecision(0)
                          << fan.current_speed << " RPM"
                          << " (target: " << fan.target_speed << " RPM"
-                         << ", " << (fan.manual_mode ? "manual" : "auto") << ")"
+                         << ", SMC " << (fan.manual_mode ? "manual" : "auto") << ")"
                          << "\n";
             }
             std::cout << "\n=== Temperatures ===\n";

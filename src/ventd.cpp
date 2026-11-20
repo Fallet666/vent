@@ -10,6 +10,7 @@
 #include <atomic>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <string>
 #include <sys/socket.h>
@@ -18,6 +19,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <poll.h>
+#include <IOKit/IOMessage.h>
+#include <IOKit/pwr_mgt/IOPMLib.h>
 
 using namespace vent;
 
@@ -50,6 +53,53 @@ enum class ControlMode {
     ManualRPM,
     AutoTemp,
 };
+
+struct PowerState {
+    SMCBackend& backend;
+    std::unordered_map<uint32_t, float>& overrides;
+    bool& overrides_dirty;
+    ControlMode& mode;
+    io_connect_t connection = IO_OBJECT_NULL;
+    bool sleeping = false;
+    std::unordered_set<uint32_t> failed_releases{};
+};
+
+static void power_callback(void* context, io_service_t, natural_t message, void* argument) {
+    auto& state = *static_cast<PowerState*>(context);
+    if (message == kIOMessageCanSystemSleep) {
+        IOAllowPowerChange(state.connection, reinterpret_cast<intptr_t>(argument));
+    } else if (message == kIOMessageSystemWillSleep) {
+        state.sleeping = true;
+        auto fans = state.backend.get_all_fans();
+        std::unordered_set<uint32_t> fan_indices;
+        for (const auto& fan : fans) {
+            fan_indices.insert(fan.index);
+        }
+        for (const auto& [index, speed] : state.overrides) {
+            (void)speed;
+            fan_indices.insert(index);
+        }
+        state.failed_releases.clear();
+        for (uint32_t index : fan_indices) {
+            if (!state.backend.set_fan_manual_mode(index, false)) {
+                state.failed_releases.insert(index);
+                std::cerr << "sleep: failed to set fan " << index << " to auto\n";
+            }
+        }
+        state.overrides.clear();
+        state.overrides_dirty = false;
+        state.mode = ControlMode::Auto;
+        IOAllowPowerChange(state.connection, reinterpret_cast<intptr_t>(argument));
+    } else if (message == kIOMessageSystemHasPoweredOn) {
+        for (uint32_t index : state.failed_releases) {
+            if (!state.backend.set_fan_manual_mode(index, false)) {
+                std::cerr << "wake: failed to set fan " << index << " to auto\n";
+            }
+        }
+        state.failed_releases.clear();
+        state.sleeping = false;
+    }
+}
 
 static const char* control_mode_to_string(ControlMode mode) {
     switch (mode) {
@@ -201,6 +251,21 @@ int main(int argc, char** argv) {
     float last_auto_temperature_rpm = 0.0f;
     std::vector<TemperatureInfo> cached_temperatures;
 
+    PowerState power{*backend, overrides, overrides_dirty, control_mode};
+    IONotificationPortRef power_port = nullptr;
+    io_object_t power_notifier = IO_OBJECT_NULL;
+    power.connection = IORegisterForSystemPower(&power, &power_port, power_callback, &power_notifier);
+    CFRunLoopSourceRef power_source = nullptr;
+    if (power.connection != IO_OBJECT_NULL && power_port) {
+        power_source = IONotificationPortGetRunLoopSource(power_port);
+        if (power_source) {
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), power_source, kCFRunLoopDefaultMode);
+        }
+    }
+    if (!power_source) {
+        std::cerr << "Warning: system sleep notifications unavailable; fans may not return to auto before sleep\n";
+    }
+
     auto now_ms = []() -> uint64_t {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -221,6 +286,7 @@ int main(int argc, char** argv) {
 
     // Main loop
     while (g_running) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
         uint64_t now = now_ms();
 
         // --- Socket I/O ---
@@ -283,7 +349,12 @@ int main(int argc, char** argv) {
                         const std::string& cmd = parts[0];
                         std::string response;
 
-                        if (cmd == "SET" && parts.size() >= 3) {
+                        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+                        if (power.sleeping && (cmd == "SET" || cmd == "SETP" || cmd == "SETALL" ||
+                                               cmd == "WRITE" || cmd == "MODE" || cmd == "AUTO" ||
+                                               cmd == "AUTOALL")) {
+                            response = "ERR System is sleeping";
+                        } else if (cmd == "SET" && parts.size() >= 3) {
                             uint32_t fan_idx;
                             float speed;
                             if (!safe_stoul(parts[1], fan_idx) || !safe_stof(parts[2], speed)) {
@@ -473,7 +544,7 @@ int main(int argc, char** argv) {
         }
 
         // --- Temperature cache refresh (every 2 seconds) ---
-        if (now - last_temperature_cache >= static_cast<uint64_t>(AUTO_TEMPERATURE_INTERVAL_MS)) {
+        if (!power.sleeping && now - last_temperature_cache >= static_cast<uint64_t>(AUTO_TEMPERATURE_INTERVAL_MS)) {
             last_temperature_cache = now;
             cached_temperatures = backend->get_all_temperatures();
             last_hottest_temperature = hottest_temperature(cached_temperatures);
@@ -527,6 +598,11 @@ int main(int argc, char** argv) {
     for (auto& c : clients) close(c.fd);
     close(server_fd);
     unlink(DAEMON_SOCKET_PATH);
+
+    if (power_source) CFRunLoopRemoveSource(CFRunLoopGetCurrent(), power_source, kCFRunLoopDefaultMode);
+    if (power_notifier != IO_OBJECT_NULL) IODeregisterForSystemPower(&power_notifier);
+    if (power.connection != IO_OBJECT_NULL) IOServiceClose(power.connection);
+    if (power_port) IONotificationPortDestroy(power_port);
 
     return 0;
 }
