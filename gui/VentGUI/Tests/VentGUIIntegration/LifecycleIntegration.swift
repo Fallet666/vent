@@ -24,6 +24,45 @@ struct LifecycleIntegration {
         check(VentDaemonClient.shared.sendCommand("TEST " + value) == "OK", "fake helper command \(value)")
     }
 
+    @MainActor static func checkSliderScale() {
+        let range = 1350.0...3275.0
+        let ticks = SliderScale.multiples(of: 500, in: range)
+        check(ticks == [1500, 2000, 2500, 3000], "RPM ticks align to absolute multiples")
+        let rpm = SliderScale(range: range, step: 50, ticks: ticks)
+        check(rpm.selection(at: 1945, magnetize: true) == 2000, "nearby drag snaps to round RPM")
+        check(rpm.selection(at: 1910, magnetize: true) == 1900, "drag outside magnet keeps fine adjustment")
+        check(rpm.selection(at: 1950, magnetize: false) == 1950, "keyboard can select an adjacent step")
+        check(rpm.selection(at: 3275, magnetize: true) == 3275, "off-grid endpoint is reachable")
+
+        let tempRange = 21.0...39.0
+        let tempTicks = TemperatureUnit.celsius.sliderTicks(in: tempRange)
+        check(tempTicks == [25, 30, 35], "temperature ticks align to absolute multiples")
+        let temp = SliderScale(range: tempRange, step: 1, ticks: tempTicks)
+        check(temp.selection(at: 29, magnetize: true) == 30, "temperature drag snaps near a tick")
+        check(temp.selection(at: 28, magnetize: true) == 28, "other temperatures remain selectable")
+        let fahrenheit = TemperatureUnit.fahrenheit
+        let fahrenheitTicks = fahrenheit.sliderTicks(in: 20...35).map { fahrenheit.convert($0).rounded() }
+        check(fahrenheitTicks == [70, 75, 90, 95], "Fahrenheit ticks are round and representable")
+
+        let slider = TrackingSlider(frame: NSRect(x: 0, y: 0, width: 280, height: 28))
+        slider.minValue = range.lowerBound
+        slider.maxValue = range.upperBound
+        slider.ticks = ticks
+        let cell = slider.cell as! NSSliderCell
+        guard let bitmap = slider.bitmapImageRepForCachingDisplay(in: slider.bounds) else {
+            check(false, "AppKit slider can render")
+            return
+        }
+        slider.cacheDisplay(in: slider.bounds, to: bitmap)
+        let rects = slider.tickRects()
+        check(rects.count == ticks.count, "AppKit lays out all round ticks")
+        for (tick, rect) in zip(ticks, rects) {
+            cell.doubleValue = tick
+            check(abs(rect.midX - cell.knobRect(flipped: slider.isFlipped).midX) <= 2,
+                  "tick aligns to the thumb at its numeric value")
+        }
+    }
+
     @MainActor static func run(_ scenario: String, manager: VentDaemonManager) async {
         fputs("TEST task entry: \(scenario)\n", stderr)
         if scenario == "unresponsive" {
@@ -61,6 +100,8 @@ struct LifecycleIntegration {
         check(!manager.isPanelVisible, "panel starts hidden")
 
         if scenario == "profiles" {
+            checkSliderScale()
+
             let delegate = NSApp.delegate as! AppDelegate
             let wasActive = NSApp.isActive
             delegate.perform(NSSelectorFromString("togglePopover"))

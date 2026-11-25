@@ -574,10 +574,12 @@ struct AutoTempModeView: View {
             }
 
             if let config = daemon.config {
+                let range = config.minTargetTemperature...config.maxTargetTemperature
                 NativeSlider(
                     value: $targetTemperature,
-                    range: config.minTargetTemperature...config.maxTargetTemperature,
-                    step: 1
+                    range: range,
+                    step: 1,
+                    ticks: temperatureUnit.sliderTicks(in: range)
                 ) { editing in
                     isEditingTemperature = editing
                     if !editing {
@@ -740,10 +742,12 @@ struct FanSliderShell: View {
             }
 
             if maxRPM > minRPM {
+                let range = Double(minRPM)...Double(maxRPM)
                 NativeSlider(
                     value: $sliderValue,
-                    range: Double(minRPM)...Double(maxRPM),
+                    range: range,
                     step: 50,
+                    ticks: SliderScale.multiples(of: 500, in: range),
                     isEnabled: !isDisabled
                 ) { editing in
                     isEditing = editing
@@ -787,6 +791,14 @@ public enum TemperatureUnit: String, CaseIterable, Identifiable {
     }
 
     public var symbol: String { title }
+
+    func sliderTicks(in range: ClosedRange<Double>) -> [Double] {
+        if self == .celsius { return SliderScale.multiples(of: 5, in: range) }
+        // Keep only round °F values the helper can represent in whole °C.
+        return SliderScale.multiples(of: 1, in: range).filter {
+            convert($0).rounded().truncatingRemainder(dividingBy: 5) == 0
+        }
+    }
 
     public func convert(_ celsius: Double) -> Double {
         switch self {
